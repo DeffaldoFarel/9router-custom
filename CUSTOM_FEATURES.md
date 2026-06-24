@@ -71,6 +71,35 @@ Authorization: Bearer sk-xxxxx
 
 ---
 
+## 2. Test All Models
+
+**Status:** ✅ Implemented
+
+Tombol "Test All" pada halaman Provider Detail untuk mengetes semua model secara otomatis dan bergantian.
+
+### Fitur Detail
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Sequential Testing** | Model dites satu per satu secara berurutan |
+| **2-Second Delay** | Jeda 2 detik setelah setiap test selesai sebelum lanjut ke model berikutnya |
+| **Visual Progress** | Icon spin saat testing, border kuning untuk model dalam antrian |
+| **Abort Button** | Tombol berubah jadi "Stop" saat testing, bisa dihentikan kapan saja |
+| **Progress Counter** | Menampilkan jumlah model tersisa: "Testing... (5 left)" |
+| **Result Indicators** | ✅ Hijau = OK, ❌ Merah = Error, ⏳ Kuning = Dalam Antrian |
+
+### Lokasi Tombol
+
+Tombol "Test All" berada di sebelah kanan tombol "Import from /models" pada halaman Provider Detail (Compatible Models section).
+
+### File yang Dimodifikasi
+
+| File | Perubahan |
+|------|-----------|
+| `src/app/(dashboard)/dashboard/providers/[id]/CompatibleModelsSection.js` | Tambah `handleTestAll`, state `testingAll`/`testQueue`, tombol "Test All" |
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
