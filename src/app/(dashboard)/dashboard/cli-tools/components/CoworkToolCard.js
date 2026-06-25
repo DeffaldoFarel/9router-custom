@@ -119,6 +119,18 @@ export default function CoworkToolCard({
 
   const configStatus = getConfigStatus();
 
+  
+  // Option A: Strict reset of models if disallowed by the selected API Key
+  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
+  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
+
+  useEffect(() => {
+    if (allowedModelsFilter.length === 0) return;
+    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
+      setSelectedModel("");
+    }
+  }, [allowedModelsFilter, selectedModel]);
+
   const handleApply = async () => {
     setMessage(null);
     const effectiveUrl = getEffectiveBaseUrl();
@@ -534,6 +546,7 @@ export default function CoworkToolCard({
         title="Select Cowork Model"
         addedModelValues={selectedModels}
         closeOnSelect={false}
+        allowedModelsFilter={allowedModelsFilter}
       />
 
       <McpMarketplaceModal

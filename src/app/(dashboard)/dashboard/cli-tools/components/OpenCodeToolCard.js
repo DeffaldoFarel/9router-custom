@@ -6,6 +6,7 @@ import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
+import { isModelAllowed } from "@/lib/modelMatcher";
 
 export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, apiKeys, activeProviders, cloudEnabled, initialStatus, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl }) {
   const [status, setStatus] = useState(initialStatus || null);
@@ -124,6 +125,18 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
       setChecking(false);
     }
   };
+
+  
+  // Option A: Strict reset of models if disallowed by the selected API Key
+  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
+  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
+
+  useEffect(() => {
+    if (allowedModelsFilter.length === 0) return;
+    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
+      setSelectedModel("");
+    }
+  }, [allowedModelsFilter, selectedModel]);
 
   const handleApply = async () => {
     setApplying(true);
@@ -477,6 +490,7 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
         addedModelValues={selectedModels}
         closeOnSelect={false}
         title="Add Model for OpenCode"
+        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ModelSelectModal
@@ -487,6 +501,7 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title="Select Subagent Model for OpenCode"
+        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ManualConfigModal
