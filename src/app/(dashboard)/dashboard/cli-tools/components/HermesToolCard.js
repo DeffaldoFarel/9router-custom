@@ -229,7 +229,7 @@ export default function HermesToolCard({
             </div>
           )}
 
-          {!checking && hermesStatus?.installed && (
+          {!checking && hermesStatus && (
             <>
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr] sm:items-center sm:gap-2">
@@ -280,14 +280,18 @@ export default function HermesToolCard({
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <Button variant="primary" size="sm" onClick={handleApply} disabled={!selectedModel} loading={applying} className="w-full sm:w-auto">
-                  <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!hermesStatus?.has9Router} loading={restoring} className="w-full sm:w-auto">
-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className="w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
+                {hermesStatus.installed && (
+                  <>
+                    <Button variant="primary" size="sm" onClick={handleApply} disabled={!selectedModel} loading={applying} className="w-full sm:w-auto">
+                      <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleReset} disabled={!hermesStatus?.has9Router} loading={restoring} className="w-full sm:w-auto">
+                      <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                    </Button>
+                  </>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className={`w-full sm:w-auto ${!hermesStatus.installed ? "!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30 border" : ""}`}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
               </div>

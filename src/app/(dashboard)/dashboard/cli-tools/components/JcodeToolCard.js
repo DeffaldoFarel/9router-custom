@@ -263,7 +263,7 @@ id = "${selectedModel || "cc/claude-opus-4-7"}"`;
             </div>
           )}
 
-          {!checkingJcode && jcodeStatus?.installed && (
+          {!checkingJcode && jcodeStatus && (
             <>
               <div className="flex flex-col gap-2">
                 {/* Info notes */}
@@ -343,14 +343,18 @@ id = "${selectedModel || "cc/claude-opus-4-7"}"`;
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
-                <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!selectedModel} loading={applying}>
-                  <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!jcodeStatus?.has9Router} loading={restoring}>
-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center mt-2">
+                {jcodeStatus.installed && (
+                  <>
+                    <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!selectedModel} loading={applying}>
+                      <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!jcodeStatus?.has9Router} loading={restoring}>
+                      <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                    </Button>
+                  </>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className={!jcodeStatus.installed ? "!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30 border" : ""}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
               </div>
