@@ -6,6 +6,7 @@ import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
+import { isModelAllowed } from "@/lib/modelMatcher";
 
 export default function OpenClawToolCard({
   tool,
@@ -126,6 +127,18 @@ export default function OpenClawToolCard({
     const url = customBaseUrl || getLocalBaseUrl();
     return url.endsWith("/v1") ? url : `${url}/v1`;
   };
+
+  
+  // Option A: Strict reset of models if disallowed by the selected API Key
+  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
+  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
+
+  useEffect(() => {
+    if (allowedModelsFilter.length === 0) return;
+    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
+      setSelectedModel("");
+    }
+  }, [allowedModelsFilter, selectedModel]);
 
   const handleApplySettings = async () => {
     setApplying(true);
@@ -373,6 +386,7 @@ export default function OpenClawToolCard({
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title="Select Model for Open Claw"
+        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ManualConfigModal

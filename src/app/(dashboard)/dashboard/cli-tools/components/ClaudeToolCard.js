@@ -6,6 +6,7 @@ import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
+import { isModelAllowed } from "@/lib/modelMatcher";
 
 const CLOUD_URL = process.env.NEXT_PUBLIC_CLOUD_URL;
 
@@ -129,6 +130,23 @@ export default function ClaudeToolCard({
       setCheckingClaude(false);
     }
   };
+
+  // Option A: Strict reset of model mappings if they are disallowed by the selected API Key
+  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
+  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
+
+  useEffect(() => {
+    if (allowedModelsFilter.length === 0) return;
+    
+    tool.defaultModels.forEach((model) => {
+      if (model.envKey) {
+        const currentValue = modelMappings[model.alias];
+        if (currentValue && !isModelAllowed(allowedModelsFilter, currentValue)) {
+          onModelMappingChange(model.alias, "");
+        }
+      }
+    });
+  }, [allowedModelsFilter, modelMappings, tool.defaultModels, onModelMappingChange]);
 
   const getEffectiveBaseUrl = () => {
     const url = customBaseUrl || baseUrl;
@@ -359,7 +377,7 @@ export default function ClaudeToolCard({
         </div>
       )}
 
-      <ModelSelectModal isOpen={modalOpen} onClose={() => setModalOpen(false)} onSelect={handleModelSelect} selectedModel={currentEditingAlias ? modelMappings[currentEditingAlias] : null} activeProviders={activeProviders} modelAliases={modelAliases} title={`Select model for ${currentEditingAlias}`} />
+      <ModelSelectModal isOpen={modalOpen} onClose={() => setModalOpen(false)} onSelect={handleModelSelect} selectedModel={currentEditingAlias ? modelMappings[currentEditingAlias] : null} activeProviders={activeProviders} modelAliases={modelAliases} title={`Select model for ${currentEditingAlias}`} allowedModelsFilter={allowedModelsFilter} />
 
       <ManualConfigModal
         isOpen={showManualConfigModal}

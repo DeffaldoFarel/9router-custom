@@ -6,6 +6,7 @@ import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
+import { isModelAllowed } from "@/lib/modelMatcher";
 
 const ENDPOINT = "/api/cli-tools/hermes-settings";
 
@@ -109,6 +110,18 @@ export default function HermesToolCard({
     const url = customBaseUrl || getLocalBaseUrl();
     return url.endsWith("/v1") ? url : `${url}/v1`;
   };
+
+  
+  // Option A: Strict reset of models if disallowed by the selected API Key
+  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
+  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
+
+  useEffect(() => {
+    if (allowedModelsFilter.length === 0) return;
+    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
+      setSelectedModel("");
+    }
+  }, [allowedModelsFilter, selectedModel]);
 
   const handleApply = async () => {
     setApplying(true);
@@ -308,6 +321,7 @@ export default function HermesToolCard({
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title="Select Model for Hermes Agent"
+        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ManualConfigModal
