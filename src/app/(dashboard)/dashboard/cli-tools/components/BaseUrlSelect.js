@@ -81,19 +81,30 @@ export default function BaseUrlSelect({
     [requiresExternalUrl, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl, cloudEnabled, cloudUrl, savedPresets, withV1]
   );
 
-  // Always default to first option (127.0.0.1) on mount, ignore persisted value
+  // Initialize mode based on passed value, or fallback to first option
   useEffect(() => {
     if (initializedRef.current) return;
     if (options.length === 0) return;
     initializedRef.current = true;
-    const first = options.find((o) => o.value !== CUSTOM_VALUE);
-    if (first) {
-      setMode(first.value);
-      onChange(first.url);
+    
+    if (value) {
+      const match = options.find((o) => o.url === value && o.value !== CUSTOM_VALUE);
+      if (match) {
+        setMode(match.value);
+      } else {
+        setMode(CUSTOM_VALUE);
+        setCustomInput(value);
+      }
     } else {
-      setMode(CUSTOM_VALUE);
+      const first = options.find((o) => o.value !== CUSTOM_VALUE);
+      if (first) {
+        setMode(first.value);
+        onChange(first.url);
+      } else {
+        setMode(CUSTOM_VALUE);
+      }
     }
-  }, [options, onChange]);
+  }, [options, value, onChange]);
 
   const handleSelect = (e) => {
     const next = e.target.value;
