@@ -76,7 +76,7 @@ export default function DeepSeekTuiToolCard({
   };
 
   useEffect(() => {
-    if (deepseekStatus?.installed && !hasInitializedModel.current) {
+    if (deepseekStatus && !hasInitializedModel.current) {
       hasInitializedModel.current = true;
       const openaiSection = deepseekStatus.settings?.["providers.openai"];
       if (openaiSection?.model) setSelectedModel(openaiSection.model);
@@ -220,22 +220,16 @@ model = "${selectedModel || "provider/model-id"}"
                     <p className="font-medium text-yellow-600 dark:text-yellow-400">DeepSeek TUI not detected locally</p>
                     <p className="text-sm text-text-muted mt-1">Install via npm:</p>
                     <code className="block mt-2 p-2 bg-black/20 rounded text-xs font-mono">npm install -g deepseek-tui</code>
-                    <p className="text-sm text-text-muted mt-2">Manual configuration is still available if 9router is deployed on a remote server.</p>
+                    <p className="text-sm text-text-muted mt-2">Manual configuration is still available if 9router is deployed on a remote server. Select your endpoint and model below, then click Manual Config to generate the settings file.</p>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 pl-9">
-                  <Button variant="secondary" size="sm" onClick={() => setShowManualConfigModal(true)} className="!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30">
-                    <span className="material-symbols-outlined text-[18px] mr-1">content_copy</span>
-                    Manual Config
-                  </Button>
                 </div>
               </div>
             </div>
           )}
 
-          {!checking && deepseekStatus?.installed && (
+          {!checking && deepseekStatus && (
             <>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 mt-2">
                 {tool.notes && tool.notes.length > 0 && (
                   <div className="flex flex-col gap-2 mb-2">
                     {tool.notes.map((note, idx) => (
@@ -267,7 +261,7 @@ model = "${selectedModel || "provider/model-id"}"
                   />
                 </div>
 
-                {deepseekStatus?.settings?.["providers.openai"]?.base_url && (
+                {deepseekStatus?.settings?.["providers.openai"]?.base_url && deepseekStatus.installed && (
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr_auto] sm:items-center sm:gap-2">
                     <span className="text-xs font-semibold text-text-main sm:text-right sm:text-sm">Current</span>
                     <span className="material-symbols-outlined hidden text-text-muted text-[14px] sm:inline">arrow_forward</span>
@@ -295,20 +289,24 @@ model = "${selectedModel || "provider/model-id"}"
               </div>
 
               {message && (
-                <div className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${message.type === "success" ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"}`}>
+                <div className={`flex items-center gap-2 px-2 py-1.5 mt-2 rounded text-xs ${message.type === "success" ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"}`}>
                   <span className="material-symbols-outlined text-[14px]">{message.type === "success" ? "check_circle" : "error"}</span>
                   <span>{message.text}</span>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
-                <Button variant="primary" size="sm" onClick={handleApply} disabled={!selectedModel} loading={applying}>
-                  <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!deepseekStatus?.has9Router} loading={restoring}>
-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center mt-2">
+                {deepseekStatus.installed && (
+                  <>
+                    <Button variant="primary" size="sm" onClick={handleApply} disabled={!selectedModel} loading={applying}>
+                      <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleReset} disabled={!deepseekStatus?.has9Router} loading={restoring}>
+                      <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                    </Button>
+                  </>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className={!deepseekStatus.installed ? "!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30 border" : ""}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
               </div>

@@ -74,7 +74,7 @@ export default function JcodeToolCard({
   };
 
   useEffect(() => {
-    if (jcodeStatus?.installed && !hasInitializedModel.current) {
+    if (jcodeStatus && !hasInitializedModel.current) {
       hasInitializedModel.current = true;
       const provider = jcodeStatus.config?.providers?.["9router"];
       if (provider) {
