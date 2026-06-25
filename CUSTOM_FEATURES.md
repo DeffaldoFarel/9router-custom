@@ -100,6 +100,39 @@ Tombol "Test All" berada di sebelah kanan tombol "Import from /models" pada hala
 
 ---
 
+## 3. Remote CLI Manual Config Availability
+
+**Status:** ✅ Implemented
+
+Memungkinkan user untuk mengakses dan mengisi secara manual *endpoint*, *api key*, dan pilihan *model* untuk tools CLI di halaman dashboard meskipun tools tersebut tidak terinstall secara lokal di perangkat host 9Router (misalnya 9Router diletakkan di remote VPS sementara CLI berada di laptop/desktop).
+
+### Fitur Detail
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Forced Config State Initialization** | State internal untuk model, endpoint dan api key di-populate biarpun CLI tool belum terinstal |
+| **Unlocked Component UI** | Komponen dropdown selector (Endpoint, API Key, Model) tetap bisa diakses dan dipilih walau tool terdeteksi tidak terinstall |
+| **Locked Executables** | Tombol *Apply* (yang mengeksekusi tulis config ke local disk) dan *Reset* tetap disembunyikan/didisable |
+| **Precise Manual Copy** | Modal *Manual Config* kini dapat men-generate konfigurasi spesifik dari pilihan user untuk bisa di-copy & paste ke CLI Tool di remote device |
+
+### File yang Dimodifikasi
+
+Semua komponen `ToolCard` yang berada di `src/app/(dashboard)/dashboard/cli-tools/components/`:
+- `ClaudeToolCard.js`
+- `CodexToolCard.js`
+- `OpenCodeToolCard.js`
+- `OpenClawToolCard.js`
+- `CoworkToolCard.js`
+- `DeepSeekTuiToolCard.js`
+- `DroidToolCard.js`
+- `HermesToolCard.js`
+- `JcodeToolCard.js`
+- `ClineToolCard.js`
+- `KiloToolCard.js`
+- `CopilotToolCard.js`
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
