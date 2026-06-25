@@ -135,10 +135,25 @@ export default function OpenClawToolCard({
 
   useEffect(() => {
     if (allowedModelsFilter.length === 0) return;
+    
+    // Reset single model
     if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
       setSelectedModel("");
     }
-  }, [allowedModelsFilter, selectedModel]);
+
+    // Reset agent models
+    if (Object.keys(agentModels).length > 0) {
+      const newAgentModels = { ...agentModels };
+      let changed = false;
+      for (const [key, val] of Object.entries(newAgentModels)) {
+        if (val && !isModelAllowed(allowedModelsFilter, val)) {
+          delete newAgentModels[key];
+          changed = true;
+        }
+      }
+      if (changed) setAgentModels(newAgentModels);
+    }
+  }, [allowedModelsFilter, selectedModel, agentModels]);
 
   const handleApplySettings = async () => {
     setApplying(true);

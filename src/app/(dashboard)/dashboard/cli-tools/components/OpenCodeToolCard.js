@@ -133,10 +133,29 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
 
   useEffect(() => {
     if (allowedModelsFilter.length === 0) return;
+    
+    // Reset single model
     if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
       setSelectedModel("");
     }
-  }, [allowedModelsFilter, selectedModel]);
+
+    // Reset array of selected models
+    if (selectedModels.length > 0) {
+      const invalidModels = selectedModels.filter(m => !isModelAllowed(allowedModelsFilter, m));
+      if (invalidModels.length > 0) {
+        setSelectedModels([]); // Clear all if any become invalid, or just filter them out? 
+        // User asked to "kosongkan" (empty) the selected models.
+        // So we clear them all or just the invalid ones? 
+        // "kosongkan Models yang diselect" implies clearing the selection.
+        // Let's just clear the whole list to be safe and consistent.
+      }
+    }
+
+    // Reset active model
+    if (activeModel && !isModelAllowed(allowedModelsFilter, activeModel)) {
+      setActiveModel("");
+    }
+  }, [allowedModelsFilter, selectedModel, selectedModels, activeModel]);
 
   const handleApply = async () => {
     setApplying(true);

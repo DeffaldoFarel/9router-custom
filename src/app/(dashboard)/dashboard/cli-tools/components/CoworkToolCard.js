@@ -126,10 +126,20 @@ export default function CoworkToolCard({
 
   useEffect(() => {
     if (allowedModelsFilter.length === 0) return;
+    
+    // Reset single model
     if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
       setSelectedModel("");
     }
-  }, [allowedModelsFilter, selectedModel]);
+
+    // Reset array of selected models
+    if (selectedModels.length > 0) {
+      const invalidModels = selectedModels.filter(m => !isModelAllowed(allowedModelsFilter, m));
+      if (invalidModels.length > 0) {
+        setSelectedModels([]);
+      }
+    }
+  }, [allowedModelsFilter, selectedModel, selectedModels]);
 
   const handleApply = async () => {
     setMessage(null);
