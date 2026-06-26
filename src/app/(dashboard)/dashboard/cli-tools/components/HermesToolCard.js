@@ -6,7 +6,6 @@ import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 const ENDPOINT = "/api/cli-tools/hermes-settings";
 
@@ -77,7 +76,7 @@ export default function HermesToolCard({
   };
 
   useEffect(() => {
-    if (hermesStatus && !hasInitializedModel.current) {
+    if (hermesStatus?.installed && !hasInitializedModel.current) {
       hasInitializedModel.current = true;
       const cfg = hermesStatus.settings?.model;
       if (cfg?.default) setSelectedModel(cfg.default);
@@ -110,18 +109,6 @@ export default function HermesToolCard({
     const url = customBaseUrl || getLocalBaseUrl();
     return url.endsWith("/v1") ? url : `${url}/v1`;
   };
-
-  
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-  }, [allowedModelsFilter, selectedModel]);
 
   const handleApply = async () => {
     setApplying(true);
@@ -242,7 +229,7 @@ export default function HermesToolCard({
             </div>
           )}
 
-          {!checking && hermesStatus && (
+          {!checking && hermesStatus?.installed && (
             <>
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr] sm:items-center sm:gap-2">
@@ -293,18 +280,14 @@ export default function HermesToolCard({
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
-                {hermesStatus.installed && (
-                  <>
-                    <Button variant="primary" size="sm" onClick={handleApply} disabled={!selectedModel} loading={applying} className="w-full sm:w-auto">
-                      <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleReset} disabled={!hermesStatus?.has9Router} loading={restoring} className="w-full sm:w-auto">
-                      <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                    </Button>
-                  </>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className={`w-full sm:w-auto ${!hermesStatus.installed ? "!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30 border" : ""}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <Button variant="primary" size="sm" onClick={handleApply} disabled={!selectedModel} loading={applying} className="w-full sm:w-auto">
+                  <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleReset} disabled={!hermesStatus?.has9Router} loading={restoring} className="w-full sm:w-auto">
+                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className="w-full sm:w-auto">
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
               </div>
@@ -321,7 +304,6 @@ export default function HermesToolCard({
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title="Select Model for Hermes Agent"
-        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ManualConfigModal

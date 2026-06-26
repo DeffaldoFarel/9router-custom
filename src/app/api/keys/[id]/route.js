@@ -21,7 +21,7 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { isActive, allowedModels } = body;
+    const { isActive } = body;
 
     const existing = await getApiKeyById(id);
     if (!existing) {
@@ -30,12 +30,6 @@ export async function PUT(request, { params }) {
 
     const updateData = {};
     if (isActive !== undefined) updateData.isActive = isActive;
-    if (allowedModels !== undefined) {
-      if (!Array.isArray(allowedModels)) {
-        return NextResponse.json({ error: "allowedModels must be an array" }, { status: 400 });
-      }
-      updateData.allowedModels = allowedModels;
-    }
 
     const updated = await updateApiKey(id, updateData);
 

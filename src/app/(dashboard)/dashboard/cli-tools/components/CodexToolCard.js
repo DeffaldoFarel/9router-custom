@@ -6,7 +6,6 @@ import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 export default function CodexToolCard({ tool, isExpanded, onToggle, baseUrl, apiKeys, activeProviders, cloudEnabled, initialStatus, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl }) {
   const [codexStatus, setCodexStatus] = useState(initialStatus || null);
@@ -94,19 +93,6 @@ export default function CodexToolCard({ tool, isExpanded, onToggle, baseUrl, api
       setCheckingCodex(false);
     }
   };
-
-  // Option A: Strict reset of selectedModel if it is disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-      setSubagentModel("");
-    }
-  }, [allowedModelsFilter, selectedModel]);
 
   const handleApplySettings = async () => {
     setApplying(true);
@@ -279,7 +265,7 @@ model = "${effectiveSubagentModel}"
             </div>
           )}
 
-          {!checkingCodex && codexStatus && (
+          {!checkingCodex && codexStatus?.installed && (
             <>
               <div className="flex flex-col gap-2">
                 {/* Endpoint (selector) */}
@@ -393,7 +379,6 @@ model = "${effectiveSubagentModel}"
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title="Select Model for Codex"
-        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ModelSelectModal
@@ -404,7 +389,6 @@ model = "${effectiveSubagentModel}"
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title="Select Subagent Model for Codex"
-        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ManualConfigModal

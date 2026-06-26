@@ -6,7 +6,6 @@ import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 export default function CopilotToolCard({ tool, isExpanded, onToggle, baseUrl, apiKeys, activeProviders, cloudEnabled, initialStatus, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl }) {
   const [status, setStatus] = useState(initialStatus || null);
@@ -109,28 +108,6 @@ export default function CopilotToolCard({ tool, isExpanded, onToggle, baseUrl, a
       setChecking(false);
     }
   };
-
-  
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    
-    // Reset single model
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-
-    // Reset array of selected models
-    if (selectedModels.length > 0) {
-      const invalidModels = selectedModels.filter(m => !isModelAllowed(allowedModelsFilter, m));
-      if (invalidModels.length > 0) {
-        setSelectedModels([]);
-      }
-    }
-  }, [allowedModelsFilter, selectedModel, selectedModels]);
 
   const handleApply = async () => {
     setApplying(true);
@@ -297,18 +274,14 @@ export default function CopilotToolCard({ tool, isExpanded, onToggle, baseUrl, a
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center mt-2">
-                {status.installed && (
-                  <>
-                    <Button variant="primary" size="sm" onClick={handleApply} disabled={selectedModels.length === 0} loading={applying}>
-                      <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleReset} disabled={!status?.has9Router} loading={restoring}>
-                      <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                    </Button>
-                  </>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} disabled={selectedModels.length === 0} className={!status.installed ? "!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30 border" : ""}>
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
+                <Button variant="primary" size="sm" onClick={handleApply} disabled={selectedModels.length === 0} loading={applying}>
+                  <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleReset} disabled={!status?.has9Router} loading={restoring}>
+                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} disabled={selectedModels.length === 0}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
               </div>
@@ -337,7 +310,6 @@ export default function CopilotToolCard({ tool, isExpanded, onToggle, baseUrl, a
         addedModelValues={selectedModels}
         closeOnSelect={false}
         title="Add Model for GitHub Copilot"
-        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ManualConfigModal

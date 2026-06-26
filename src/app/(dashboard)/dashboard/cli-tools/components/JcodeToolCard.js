@@ -6,7 +6,6 @@ import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 export default function JcodeToolCard({
   tool,
@@ -75,7 +74,7 @@ export default function JcodeToolCard({
   };
 
   useEffect(() => {
-    if (jcodeStatus && !hasInitializedModel.current) {
+    if (jcodeStatus?.installed && !hasInitializedModel.current) {
       hasInitializedModel.current = true;
       const provider = jcodeStatus.config?.providers?.["9router"];
       if (provider) {
@@ -122,18 +121,6 @@ export default function JcodeToolCard({
     const url = customBaseUrl || getLocalBaseUrl();
     return url.endsWith("/v1") ? url : `${url}/v1`;
   };
-
-  
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-  }, [allowedModelsFilter, selectedModel]);
 
   const handleApplySettings = async () => {
     setApplying(true);
@@ -276,7 +263,7 @@ id = "${selectedModel || "cc/claude-opus-4-7"}"`;
             </div>
           )}
 
-          {!checkingJcode && jcodeStatus && (
+          {!checkingJcode && jcodeStatus?.installed && (
             <>
               <div className="flex flex-col gap-2">
                 {/* Info notes */}
@@ -356,18 +343,14 @@ id = "${selectedModel || "cc/claude-opus-4-7"}"`;
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center mt-2">
-                {jcodeStatus.installed && (
-                  <>
-                    <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!selectedModel} loading={applying}>
-                      <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!jcodeStatus?.has9Router} loading={restoring}>
-                      <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                    </Button>
-                  </>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className={!jcodeStatus.installed ? "!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30 border" : ""}>
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
+                <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!selectedModel} loading={applying}>
+                  <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!jcodeStatus?.has9Router} loading={restoring}>
+                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
               </div>
@@ -384,7 +367,6 @@ id = "${selectedModel || "cc/claude-opus-4-7"}"`;
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title="Select Model for jcode"
-        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ManualConfigModal

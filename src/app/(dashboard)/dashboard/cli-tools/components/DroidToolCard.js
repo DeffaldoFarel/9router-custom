@@ -6,7 +6,6 @@ import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 const CLOUD_URL = process.env.NEXT_PUBLIC_CLOUD_URL;
 
@@ -80,7 +79,7 @@ export default function DroidToolCard({
 
   // Pre-fill model list from existing config (supports multi-model)
   useEffect(() => {
-    if (droidStatus && !hasInitializedModel.current) {
+    if (droidStatus?.installed && !hasInitializedModel.current) {
       hasInitializedModel.current = true;
       const existingModels = (droidStatus.settings?.customModels || [])
         .filter(m => m.id?.startsWith("custom:9Router"))
@@ -135,18 +134,6 @@ export default function DroidToolCard({
     setModelList((prev) => [...prev, model.value]);
     setModalOpen(false);
   };
-
-  
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-  }, [allowedModelsFilter, selectedModel]);
 
   const handleApplySettings = async () => {
     setApplying(true);
@@ -298,7 +285,7 @@ export default function DroidToolCard({
             </div>
           )}
 
-          {!checkingDroid && droidStatus && (
+          {!checkingDroid && droidStatus?.installed && (
             <>
               <div className="flex flex-col gap-2">
                 {/* Endpoint (selector) */}
@@ -386,18 +373,14 @@ export default function DroidToolCard({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center mt-2">
-                {droidStatus.installed && (
-                  <>
-                    <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={modelList.length === 0} loading={applying}>
-                      <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!droidStatus?.has9Router} loading={restoring}>
-                      <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                    </Button>
-                  </>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className={!droidStatus.installed ? "!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30 border" : ""}>
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
+                <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={modelList.length === 0} loading={applying}>
+                  <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!droidStatus?.has9Router} loading={restoring}>
+                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
               </div>
@@ -414,7 +397,6 @@ export default function DroidToolCard({
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title="Select Model for Factory Droid"
-        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ManualConfigModal

@@ -32,12 +32,6 @@ const writeSavedPresets = (presets) => {
 const buildOptions = ({ requiresExternalUrl, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl, cloudEnabled, cloudUrl, savedPresets, withV1 }) => {
   const opts = [];
   const wrap = (url) => (withV1 ? ensureV1(url) : (url || "").replace(/\/+$/, ""));
-  
-  if (typeof window !== "undefined") {
-    const currentUrl = wrap(window.location.origin);
-    opts.push({ value: "current", label: `${currentUrl} (Current Network)`, url: currentUrl });
-  }
-
   if (!requiresExternalUrl) {
     const localUrl = wrap(`http://127.0.0.1:${UPDATER_CONFIG.appPort}`);
     opts.push({ value: "local", label: localUrl, url: localUrl });
@@ -87,30 +81,19 @@ export default function BaseUrlSelect({
     [requiresExternalUrl, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl, cloudEnabled, cloudUrl, savedPresets, withV1]
   );
 
-  // Initialize mode based on passed value, or fallback to first option
+  // Always default to first option (127.0.0.1) on mount, ignore persisted value
   useEffect(() => {
     if (initializedRef.current) return;
     if (options.length === 0) return;
     initializedRef.current = true;
-    
-    if (value) {
-      const match = options.find((o) => o.url === value && o.value !== CUSTOM_VALUE);
-      if (match) {
-        setMode(match.value);
-      } else {
-        setMode(CUSTOM_VALUE);
-        setCustomInput(value);
-      }
+    const first = options.find((o) => o.value !== CUSTOM_VALUE);
+    if (first) {
+      setMode(first.value);
+      onChange(first.url);
     } else {
-      const first = options.find((o) => o.value !== CUSTOM_VALUE);
-      if (first) {
-        setMode(first.value);
-        onChange(first.url);
-      } else {
-        setMode(CUSTOM_VALUE);
-      }
+      setMode(CUSTOM_VALUE);
     }
-  }, [options, value, onChange]);
+  }, [options, onChange]);
 
   const handleSelect = (e) => {
     const next = e.target.value;

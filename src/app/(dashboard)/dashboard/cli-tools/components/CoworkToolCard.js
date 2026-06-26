@@ -119,28 +119,6 @@ export default function CoworkToolCard({
 
   const configStatus = getConfigStatus();
 
-  
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    
-    // Reset single model
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-
-    // Reset array of selected models
-    if (selectedModels.length > 0) {
-      const invalidModels = selectedModels.filter(m => !isModelAllowed(allowedModelsFilter, m));
-      if (invalidModels.length > 0) {
-        setSelectedModels([]);
-      }
-    }
-  }, [allowedModelsFilter, selectedModel, selectedModels]);
-
   const handleApply = async () => {
     setMessage(null);
     const effectiveUrl = getEffectiveBaseUrl();
@@ -313,7 +291,7 @@ export default function CoworkToolCard({
             </div>
           )}
 
-          {!checking && status && (
+          {!checking && status?.installed && (
             <>
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr] sm:items-center sm:gap-2">
@@ -513,18 +491,14 @@ export default function CoworkToolCard({
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
-                {status.installed && (
-                  <>
-                    <Button variant="primary" size="sm" onClick={handleApply} disabled={selectedModels.length === 0} loading={applying} className="w-full sm:w-auto">
-                      <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleReset} disabled={!status.has9Router} loading={restoring} className="w-full sm:w-auto">
-                      <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                    </Button>
-                  </>
-                )}
-                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className={`w-full sm:w-auto ${!status.installed ? "!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30 border" : ""}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <Button variant="primary" size="sm" onClick={handleApply} disabled={selectedModels.length === 0} loading={applying} className="w-full sm:w-auto">
+                  <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleReset} disabled={!status.has9Router} loading={restoring} className="w-full sm:w-auto">
+                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className="w-full sm:w-auto">
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
               </div>
@@ -560,7 +534,6 @@ export default function CoworkToolCard({
         title="Select Cowork Model"
         addedModelValues={selectedModels}
         closeOnSelect={false}
-        allowedModelsFilter={allowedModelsFilter}
       />
 
       <McpMarketplaceModal

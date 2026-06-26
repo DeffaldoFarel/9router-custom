@@ -7,7 +7,6 @@ import ProviderIcon from "./ProviderIcon";
 import CapacityBadges from "./CapacityBadges";
 import { useModelCaps } from "@/shared/hooks/useModelCaps";
 import { getModelsByProviderId, getModelKind } from "@/shared/constants/models";
-import { isModelAllowed } from "@/lib/modelMatcher";
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, AI_PROVIDERS, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, getProviderAlias } from "@/shared/constants/providers";
 
 // Provider order: OAuth first, then Free Tier, then API Key (matches dashboard/providers)
@@ -33,7 +32,6 @@ export default function ModelSelectModal({
   kindFilter = null,
   addedModelValues = [],
   closeOnSelect = true,
-  allowedModelsFilter = [],
 }) {
   // Filter activeProviders by serviceKinds when kindFilter set (e.g. "webSearch", "webFetch")
   const filteredActiveProviders = useMemo(() => {
@@ -251,21 +249,21 @@ export default function ModelSelectModal({
             value: `${nodePrefix}/${fullModel.replace(`${providerId}/`, "")}`,
           }));
 
-        // Custom models registered via provider "Add Model" button
-        const customRegisteredModels = customModels
-          .filter((m) => m.providerAlias === nodePrefix || m.providerAlias === providerId)
-          .map((m) => ({ id: m.id, name: m.name || m.id, value: `${nodePrefix}/${m.id}`, isCustom: true }));
+        // Merge custom models registered via /api/models/custom for this provider
+        // providerAlias in DB uses the raw providerId, not the display prefix
+        const registeredCustom = customModels
+          .filter((m) => m.providerAlias === providerId)
+          .map((m) => ({
+            id: m.id,
+            name: m.name || m.id,
+            value: `${nodePrefix}/${m.id}`,
+            isCustom: true,
+          }));
+        const seen = new Set(nodeModels.map((m) => m.value));
+        const mergedModels = [...nodeModels, ...registeredCustom.filter((m) => !seen.has(m.value))];
 
-        // Merge aliases and custom models, dedupe by value
-        const seen = new Set();
-        const mergedModels = [...nodeModels, ...customRegisteredModels].filter((m) => {
-          if (seen.has(m.value)) return false;
-          seen.add(m.value);
-          return true;
-        });
-
-        // Always show compatible providers that are connected, even with no models.
-        // When no models exist, show a placeholder so users know it's available.
+        // Always show compatible providers that are connected, even with no aliases.
+        // When no aliases exist, show a placeholder so users know it's available.
         const modelsToShow = mergedModels.length > 0 ? mergedModels : [{
           id: `__placeholder__${providerId}`,
           name: `${nodePrefix}/model-id`,
@@ -354,22 +352,12 @@ export default function ModelSelectModal({
   }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders]);
 
   // Filter combos by search query (and hide combos when kindFilter is set — combos are LLM-only by design)
-  // AND filter by allowedModelsFilter if provided
   const filteredCombos = useMemo(() => {
     if (kindFilter) return [];
-    
-    let filtered = combos;
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = combos.filter(c => c.name.toLowerCase().includes(query));
-    }
-    
-    if (allowedModelsFilter.length > 0) {
-      filtered = filtered.filter(c => isModelAllowed(allowedModelsFilter, c.name));
-    }
-    
-    return filtered;
-  }, [combos, searchQuery, kindFilter, allowedModelsFilter]);
+    if (!searchQuery.trim()) return combos;
+    const query = searchQuery.toLowerCase();
+    return combos.filter(c => c.name.toLowerCase().includes(query));
+  }, [combos, searchQuery, kindFilter]);
 
   // Sort models alphabetically, with added models floated to top
   const sortModels = (models) => {
@@ -378,19 +366,13 @@ export default function ModelSelectModal({
     return [...added, ...rest];
   };
 
-  // Filter models by search query AND allowedModelsFilter
+  // Filter models by search query
   const filteredGroups = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
     const filtered = {};
     Object.entries(groupedModels).forEach(([providerId, group]) => {
       let models = group.models;
-      
-      // Filter by allowedModelsFilter
-      if (allowedModelsFilter.length > 0) {
-        models = models.filter((m) => isModelAllowed(allowedModelsFilter, m.value));
-      }
-
       if (query) {
         const providerNameMatches = group.name.toLowerCase().includes(query);
         models = models.filter(
@@ -400,17 +382,14 @@ export default function ModelSelectModal({
         );
         if (models.length === 0 && !providerNameMatches) return;
       }
-      
-      if (models.length > 0) {
-        filtered[providerId] = {
-          ...group,
-          models: sortModels(models),
-        };
-      }
+      filtered[providerId] = {
+        ...group,
+        models: sortModels(models),
+      };
     });
 
     return filtered;
-  }, [groupedModels, searchQuery, addedModelValues, allowedModelsFilter]);
+  }, [groupedModels, searchQuery, addedModelValues]);
 
   const handleSelect = (model) => {
     const value = model?.value || model?.name || model;
@@ -599,5 +578,4 @@ ModelSelectModal.propTypes = {
   kindFilter: PropTypes.string,
   addedModelValues: PropTypes.arrayOf(PropTypes.string),
   closeOnSelect: PropTypes.bool,
-  allowedModelsFilter: PropTypes.arrayOf(PropTypes.string),
 };

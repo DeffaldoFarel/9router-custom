@@ -1,24 +1,20 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import PropTypes from "prop-types";
 import { Button } from "@/shared/components";
 import { getProviderCustomModelRows } from "@/shared/utils/providerCustomModels";
-function CompatibleModelRow({ modelId, fullModel, copied, onCopy, onDeleteAlias, onTest, testStatus, isTesting, isQueue }) {
+function CompatibleModelRow({ modelId, fullModel, copied, onCopy, onDeleteAlias, onTest, testStatus, isTesting }) {
   const borderColor = testStatus === "ok"
     ? "border-green-500/40"
     : testStatus === "error"
     ? "border-red-500/40"
-    : isQueue
-    ? "border-yellow-500/40"
     : "border-border";
 
   const iconColor = testStatus === "ok"
     ? "#22c55e"
     : testStatus === "error"
     ? "#ef4444"
-    : isQueue
-    ? "#eab308"
     : undefined;
 
   return (
@@ -27,7 +23,7 @@ function CompatibleModelRow({ modelId, fullModel, copied, onCopy, onDeleteAlias,
         className="material-symbols-outlined text-base text-text-muted"
         style={iconColor ? { color: iconColor } : undefined}
       >
-        {testStatus === "ok" ? "check_circle" : testStatus === "error" ? "cancel" : isQueue ? "hourglass_top" : "smart_toy"}
+        {testStatus === "ok" ? "check_circle" : testStatus === "error" ? "cancel" : "smart_toy"}
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{modelId}</p>
@@ -81,9 +77,6 @@ export default function CompatibleModelsSection({ providerStorageAlias, provider
   const [importing, setImporting] = useState(false);
   const [testingModelId, setTestingModelId] = useState(null);
   const [modelTestResults, setModelTestResults] = useState({});
-  const [testingAll, setTestingAll] = useState(false);
-  const [testQueue, setTestQueue] = useState([]);
-  const testAbortRef = useRef(false);
 
   const handleTestModel = async (modelId) => {
     if (testingModelId) return;
@@ -101,52 +94,6 @@ export default function CompatibleModelsSection({ providerStorageAlias, provider
     } finally {
       setTestingModelId(null);
     }
-  };
-
-  const handleTestAll = async () => {
-    if (testingAll) {
-      testAbortRef.current = true;
-      return;
-    }
-
-    testAbortRef.current = false;
-    setTestingAll(true);
-
-    const models = allModels.map((m) => m.id);
-    setTestQueue(models);
-
-    for (let i = 0; i < models.length; i++) {
-      if (testAbortRef.current) break;
-
-      const modelId = models[i];
-      setTestingModelId(modelId);
-
-      try {
-        const res = await fetch("/api/models/test", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: `${providerStorageAlias}/${modelId}` }),
-        });
-        const data = await res.json();
-        setModelTestResults((prev) => ({ ...prev, [modelId]: data.ok ? "ok" : "error" }));
-      } catch {
-        setModelTestResults((prev) => ({ ...prev, [modelId]: "error" }));
-      } finally {
-        setTestingModelId(null);
-      }
-
-      // Update queue
-      setTestQueue((prev) => prev.filter((id) => id !== modelId));
-
-      // Wait 2 seconds before next test (unless aborted or last model)
-      if (i < models.length - 1 && !testAbortRef.current) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
-    }
-
-    setTestingAll(false);
-    setTestQueue([]);
-    testAbortRef.current = false;
   };
 
   const allModels = getProviderCustomModelRows({
@@ -238,18 +185,6 @@ export default function CompatibleModelsSection({ providerStorageAlias, provider
         <Button size="sm" variant="secondary" icon="download" onClick={handleImport} disabled={!canImport || importing}>
           {importing ? "Importing..." : "Import from /models"}
         </Button>
-        {allModels.length > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            icon={testingAll ? "stop" : "auto_awesome"}
-            onClick={handleTestAll}
-            disabled={!canImport || allModels.length === 0}
-            className={testingAll ? "animate-pulse" : ""}
-          >
-            {testingAll ? `Testing... (${testQueue.length} left)` : `Test All (${allModels.length})`}
-          </Button>
-        )}
       </div>
 
       {!canImport && (
@@ -271,7 +206,6 @@ export default function CompatibleModelsSection({ providerStorageAlias, provider
               onTest={connections.length > 0 ? () => handleTestModel(id) : undefined}
               testStatus={modelTestResults[id]}
               isTesting={testingModelId === id}
-              isQueue={testQueue.includes(id) && testingModelId !== id}
             />
           ))}
         </div>

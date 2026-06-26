@@ -9,10 +9,9 @@ import { getProviderConnections, getCombos, getCustomModels, getModelAliases } f
 import { getDisabledModels } from "@/lib/disabledModelsDb";
 import { resolveKiroModels } from "open-sse/services/kiroModels.js";
 import { resolveQoderModels } from "open-sse/services/qoderModels.js";
+import { resolveCopilotModels } from "open-sse/services/copilotModels.js";
+import { updateProviderCredentials } from "@/sse/services/tokenRefresh";
 import { capabilitiesFromServiceKind } from "open-sse/providers/capabilities.js";
-import { filterModelsList } from "@/lib/modelMatcher.js";
-import { extractApiKey } from "@/sse/services/auth.js";
-import { getApiKeyByActualKey } from "@/lib/localDb";
 
 // Per-provider live model resolvers. Each receives a connection record and
 // returns { models: [{ id, name? }, ...] } | null on failure.
@@ -38,6 +37,23 @@ const LIVE_MODEL_RESOLVERS = {
     return {
       models: result.models.map((m) => ({ id: m.id, name: m.name })),
     };
+  },
+  github: async (conn) => {
+    const result = await resolveCopilotModels({
+      accessToken: conn.accessToken,
+      refreshToken: conn.refreshToken,
+      providerSpecificData: conn.providerSpecificData || {}
+    }, {
+      log: console,
+      onCredentialsRefreshed: async (refreshed) => {
+        await updateProviderCredentials(conn.id, {
+          copilotToken: refreshed.copilotToken,
+          copilotTokenExpiresAt: refreshed.copilotTokenExpiresAt,
+          existingProviderSpecificData: conn.providerSpecificData || {},
+        });
+      },
+    });
+    return result?.models?.length ? { models: result.models } : null;
   }
 };
 
@@ -155,11 +171,8 @@ function comboMatchesKinds(combo, kindFilter) {
 /**
  * Build OpenAI-format models list filtered by service kinds.
  * @param {string[]} kindFilter - List of service kinds to include (e.g. ["llm"], ["webSearch","webFetch"]).
- * @param {object} options - Optional parameters
- * @param {string} options.apiKey - API key to filter models by allowed models
  */
-export async function buildModelsList(kindFilter, options = {}) {
-  const { apiKey } = options;
+export async function buildModelsList(kindFilter) {
   let connections = [];
   try {
     connections = await getProviderConnections();
@@ -412,19 +425,6 @@ export async function buildModelsList(kindFilter, options = {}) {
     dedupedModels.push(model);
   }
 
-  // Filter by API key allowed models
-  if (apiKey) {
-    try {
-      const keyRecord = await getApiKeyByActualKey(apiKey);
-      if (keyRecord?.allowedModels?.length > 0) {
-        return filterModelsList(keyRecord.allowedModels, dedupedModels);
-      }
-    } catch (e) {
-      // If key lookup fails, return unfiltered (fail-open)
-      console.log("API key model filter error:", e?.message || e);
-    }
-  }
-
   return dedupedModels;
 }
 
@@ -445,10 +445,9 @@ export async function OPTIONS() {
  * GET /v1/models - OpenAI compatible models list (LLM/chat models only by default).
  * For other capabilities use /v1/models/{kind} (image, tts, stt, embedding, image-to-text, web).
  */
-export async function GET(request) {
+export async function GET() {
   try {
-    const apiKey = extractApiKey(request);
-    const data = await buildModelsList([LLM_KIND], { apiKey });
+    const data = await buildModelsList([LLM_KIND]);
     return Response.json({ object: "list", data }, {
       headers: { "Access-Control-Allow-Origin": "*" },
     });
