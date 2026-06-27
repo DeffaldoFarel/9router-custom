@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
+import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip, ApiKeyModelAccessModal } from "@/shared/components";
 import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
@@ -38,6 +38,7 @@ export default function ClaudeToolCard({
   const [selectedApiKey, setSelectedApiKey] = useState("");
   const [modelAliases, setModelAliases] = useState({});
   const [showManualConfigModal, setShowManualConfigModal] = useState(false);
+  const [showAllowedModelModal, setShowAllowedModelModal] = useState(false);
   const [customBaseUrl, setCustomBaseUrl] = useState("");
   const [ccFilterNaming, setCcFilterNaming] = useState(false);
   const hasInitializedModels = useRef(false);
@@ -389,6 +390,9 @@ export default function ClaudeToolCard({
                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
                 </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowAllowedModelModal(true)}>
+                  <span className="material-symbols-outlined text-[14px] mr-1">lock</span>Allowed Model per API Key
+                </Button>
               </div>
             </>
           )}
@@ -402,6 +406,23 @@ export default function ClaudeToolCard({
         onClose={() => setShowManualConfigModal(false)}
         title="Claude CLI - Manual Configuration"
         configs={getManualConfigs()}
+      />
+
+      <ApiKeyModelAccessModal
+        isOpen={showAllowedModelModal}
+        keyName={selectedApiKey}
+        currentAllowedModels={apiKeys?.find(k => k.key === selectedApiKey)?.allowedModels || []}
+        onClose={() => setShowAllowedModelModal(false)}
+        onSave={async (patterns) => {
+          const keyObj = apiKeys?.find(k => k.key === selectedApiKey);
+          if (!keyObj) return;
+          await fetch(`/api/keys/${keyObj.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ allowedModels: patterns }),
+          });
+        }}
+        activeProviders={activeProviders}
       />
     </Card>
   );
