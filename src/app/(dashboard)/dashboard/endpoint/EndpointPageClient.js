@@ -1303,7 +1303,7 @@ export default function APIPageClient({ machineId }) {
           if (!selectedKeyForModels) return;
           try {
             await fetch(`/api/keys/${selectedKeyForModels.id}`, {
-              method: "PATCH",
+              method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ allowedModels: patterns }),
             });
