@@ -12,6 +12,8 @@ import { resolveQoderModels } from "open-sse/services/qoderModels.js";
 import { resolveCopilotModels } from "open-sse/services/copilotModels.js";
 import { updateProviderCredentials } from "@/sse/services/tokenRefresh";
 import { capabilitiesFromServiceKind } from "open-sse/providers/capabilities.js";
+import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
+import { isModelAllowed } from "@/lib/modelMatcher";
 
 // Per-provider live model resolvers. Each receives a connection record and
 // returns { models: [{ id, name? }, ...] } | null on failure.
@@ -445,9 +447,19 @@ export async function OPTIONS() {
  * GET /v1/models - OpenAI compatible models list (LLM/chat models only by default).
  * For other capabilities use /v1/models/{kind} (image, tts, stt, embedding, image-to-text, web).
  */
-export async function GET() {
+export async function GET(request) {
   try {
-    const data = await buildModelsList([LLM_KIND]);
+    let data = await buildModelsList([LLM_KIND]);
+
+    // Check API Key restrictions
+    const apiKey = extractApiKey(request);
+    if (apiKey) {
+      const keyRecord = await isValidApiKey(apiKey, true); // true to get full record
+      if (keyRecord?.allowedModels?.length > 0) {
+        data = data.filter(m => isModelAllowed(keyRecord.allowedModels, m.id));
+      }
+    }
+
     return Response.json({ object: "list", data }, {
       headers: { "Access-Control-Allow-Origin": "*" },
     });
