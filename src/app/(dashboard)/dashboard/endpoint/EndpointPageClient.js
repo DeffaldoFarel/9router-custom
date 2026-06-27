@@ -19,6 +19,7 @@ import Tooltip from "./components/Tooltip";
 import SecurityWarning from "./components/SecurityWarning";
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
+  const [activeProviders, setActiveProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
@@ -257,10 +258,17 @@ export default function APIPageClient({ machineId }) {
 
   const fetchData = async () => {
     try {
-      const keysRes = await fetch("/api/keys");
+      const [keysRes, providersRes] = await Promise.all([
+        fetch("/api/keys"),
+        fetch("/api/providers"),
+      ]);
       const keysData = await keysRes.json();
       if (keysRes.ok) {
         setKeys(keysData.keys || []);
+      }
+      const providersData = await providersRes.json();
+      if (providersRes.ok) {
+        setActiveProviders(providersData.connections?.filter(c => c.isActive !== false) || []);
       }
     } catch (error) {
       console.log("Error fetching data:", error);
@@ -1309,7 +1317,7 @@ export default function APIPageClient({ machineId }) {
             console.error("Failed to save allowed models:", err);
           }
         }}
-        activeProviders={keys}
+        activeProviders={activeProviders}
       />
 
       {/* Confirm Modal */}

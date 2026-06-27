@@ -279,7 +279,7 @@ model = "${effectiveSubagentModel}"
             </div>
           )}
 
-          {!checkingCodex && codexStatus?.installed && (
+          {!checkingCodex && codexStatus && (
             <>
               <div className="flex flex-col gap-2">
                 {/* Endpoint (selector) */}
