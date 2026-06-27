@@ -1302,17 +1302,27 @@ export default function APIPageClient({ machineId }) {
         onSave={async (patterns) => {
           if (!selectedKeyForModels) return;
           try {
-            await fetch(`/api/keys/${selectedKeyForModels.id}`, {
+            const saveRes = await fetch(`/api/keys/${selectedKeyForModels.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ allowedModels: patterns }),
             });
+            
+            if (!saveRes.ok) {
+              console.error("Failed to save allowed models:", await saveRes.text());
+              return;
+            }
+
             // Refresh keys list
             const res = await fetch("/api/keys");
             if (res.ok) {
               const data = await res.json();
               setKeys(data.keys || []);
             }
+            
+            // Close the modal on success
+            setShowAllowedModelModal(false);
+            setSelectedKeyForModels(null);
           } catch (err) {
             console.error("Failed to save allowed models:", err);
           }
