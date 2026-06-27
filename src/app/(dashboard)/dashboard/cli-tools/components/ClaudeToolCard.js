@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip, ApiKeyModelAccessModal } from "@/shared/components";
+import { Card, Button, ModelSelectModal, ManualConfigModal, Tooltip } from "@/shared/components";
 import Image from "next/image";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
@@ -38,7 +38,6 @@ export default function ClaudeToolCard({
   const [selectedApiKey, setSelectedApiKey] = useState("");
   const [modelAliases, setModelAliases] = useState({});
   const [showManualConfigModal, setShowManualConfigModal] = useState(false);
-  const [showAllowedModelModal, setShowAllowedModelModal] = useState(false);
   const [customBaseUrl, setCustomBaseUrl] = useState("");
   const [ccFilterNaming, setCcFilterNaming] = useState(false);
   const hasInitializedModels = useRef(false);
@@ -98,7 +97,7 @@ export default function ClaudeToolCard({
   };
 
   useEffect(() => {
-    if (claudeStatus?.installed && !hasInitializedModels.current) {
+    if (claudeStatus && !hasInitializedModels.current) {
       hasInitializedModels.current = true;
       const env = claudeStatus.settings?.env || {};
 
@@ -281,38 +280,16 @@ export default function ClaudeToolCard({
                   <span className="material-symbols-outlined text-yellow-500">warning</span>
                   <div className="flex-1">
                     <p className="font-medium text-yellow-600 dark:text-yellow-400">Claude CLI not detected locally</p>
-                    <p className="text-sm text-text-muted">Manual configuration is still available if 9router is deployed on a remote server.</p>
+                    <p className="text-sm text-text-muted mt-1">Manual configuration is still available if 9router is deployed on a remote server. Select your endpoint and model below, then click Manual Config to generate the settings file.</p>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 pl-9">
-                  <Button variant="secondary" size="sm" onClick={() => setShowManualConfigModal(true)} className="!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30">
-                    <span className="material-symbols-outlined text-[18px] mr-1">content_copy</span>
-                    Manual Config
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setShowInstallGuide(!showInstallGuide)}>
-                    <span className="material-symbols-outlined text-[18px] mr-1">{showInstallGuide ? "expand_less" : "help"}</span>
-                    {showInstallGuide ? "Hide" : "How to Install"}
-                  </Button>
                 </div>
               </div>
-              {showInstallGuide && (
-                <div className="p-4 bg-surface border border-border rounded-lg">
-                  <h4 className="font-medium mb-3">Installation Guide</h4>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="text-text-muted mb-1">macOS / Linux / Windows:</p>
-                      <code className="block px-3 py-2 bg-black/5 dark:bg-white/5 rounded font-mono text-xs">npm install -g @anthropic-ai/claude-code</code>
-                    </div>
-                    <p className="text-text-muted">After installation, run <code className="px-1 bg-black/5 dark:bg-white/5 rounded">claude</code> to verify.</p>
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-          {!checkingClaude && claudeStatus?.installed && (
+          {!checkingClaude && claudeStatus && (
             <>
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 mt-2">
                 {/* Endpoint (selector) */}
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr] sm:items-center sm:gap-2">
                   <span className="text-xs font-semibold text-text-main sm:text-right sm:text-sm">Select Endpoint</span>
@@ -329,7 +306,7 @@ export default function ClaudeToolCard({
                 </div>
 
                 {/* Current configured */}
-                {claudeStatus?.settings?.env?.ANTHROPIC_BASE_URL && (
+                {claudeStatus?.settings?.env?.ANTHROPIC_BASE_URL && claudeStatus.installed && (
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr_auto] sm:items-center sm:gap-2">
                     <span className="text-xs font-semibold text-text-main sm:text-right sm:text-sm">Current</span>
                     <span className="material-symbols-outlined hidden text-text-muted text-[14px] sm:inline">arrow_forward</span>
@@ -374,24 +351,25 @@ export default function ClaudeToolCard({
               </div>
 
               {message && (
-                <div className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${message.type === "success" ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"}`}>
+                <div className={`flex items-center gap-2 px-2 py-1.5 mt-2 rounded text-xs ${message.type === "success" ? "bg-green-500/10 text-green-600" : "bg-red-500/10 text-red-600"}`}>
                   <span className="material-symbols-outlined text-[14px]">{message.type === "success" ? "check_circle" : "error"}</span>
                   <span>{message.text}</span>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center">
-                <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!hasActiveProviders} loading={applying}>
-                  <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!claudeStatus?.has9Router} loading={restoring}>
-                  <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:items-center mt-2">
+                {claudeStatus.installed && (
+                  <>
+                    <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!hasActiveProviders} loading={applying}>
+                      <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!claudeStatus?.has9Router} loading={restoring}>
+                      <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
+                    </Button>
+                  </>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)} className={!claudeStatus.installed ? "!bg-yellow-500/20 !border-yellow-500/40 !text-yellow-700 dark:!text-yellow-300 hover:!bg-yellow-500/30 border" : ""}>
                   <span className="material-symbols-outlined text-[14px] mr-1">content_copy</span>Manual Config
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowAllowedModelModal(true)}>
-                  <span className="material-symbols-outlined text-[14px] mr-1">lock</span>Allowed Model per API Key
                 </Button>
               </div>
             </>
@@ -406,23 +384,6 @@ export default function ClaudeToolCard({
         onClose={() => setShowManualConfigModal(false)}
         title="Claude CLI - Manual Configuration"
         configs={getManualConfigs()}
-      />
-
-      <ApiKeyModelAccessModal
-        isOpen={showAllowedModelModal}
-        keyName={selectedApiKey}
-        currentAllowedModels={apiKeys?.find(k => k.key === selectedApiKey)?.allowedModels || []}
-        onClose={() => setShowAllowedModelModal(false)}
-        onSave={async (patterns) => {
-          const keyObj = apiKeys?.find(k => k.key === selectedApiKey);
-          if (!keyObj) return;
-          await fetch(`/api/keys/${keyObj.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ allowedModels: patterns }),
-          });
-        }}
-        activeProviders={activeProviders}
       />
     </Card>
   );

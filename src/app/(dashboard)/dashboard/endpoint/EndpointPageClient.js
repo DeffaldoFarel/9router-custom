@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
-import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal } from "@/shared/components";
+import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal, ApiKeyModelAccessModal } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import {
   TUNNEL_BENEFITS,
@@ -24,6 +24,8 @@ export default function APIPageClient({ machineId }) {
   const [newKeyName, setNewKeyName] = useState("");
   const [createdKey, setCreatedKey] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
+  const [showAllowedModelModal, setShowAllowedModelModal] = useState(false);
+  const [selectedKeyForModels, setSelectedKeyForModels] = useState(null);
 
   const [requireApiKey, setRequireApiKey] = useState(false);
   const [requireLogin, setRequireLogin] = useState(true);
@@ -1048,12 +1050,19 @@ export default function APIPageClient({ machineId }) {
                     }}
                     title={key.isActive ? "Pause key" : "Resume key"}
                   />
-                  <button
-                    onClick={() => handleDeleteKey(key.id)}
-                    className="p-2 hover:bg-red-500/10 rounded text-red-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
-                  </button>
+                    <button
+                      onClick={() => { setSelectedKeyForModels(key); setShowAllowedModelModal(true); }}
+                      className="p-2 hover:bg-primary/10 rounded text-primary opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                      title="Manage allowed models"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">lock</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteKey(key.id)}
+                      className="p-2 hover:bg-red-500/10 rounded text-red-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
                 </div>
               </div>
             ))}
@@ -1275,6 +1284,33 @@ export default function APIPageClient({ machineId }) {
           </div>
         </div>
       </Modal>
+
+      {/* Allowed Model Modal */}
+      <ApiKeyModelAccessModal
+        isOpen={showAllowedModelModal}
+        keyName={selectedKeyForModels?.name || ""}
+        currentAllowedModels={selectedKeyForModels?.allowedModels || []}
+        onClose={() => { setShowAllowedModelModal(false); setSelectedKeyForModels(null); }}
+        onSave={async (patterns) => {
+          if (!selectedKeyForModels) return;
+          try {
+            await fetch(`/api/keys/${selectedKeyForModels.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ allowedModels: patterns }),
+            });
+            // Refresh keys list
+            const res = await fetch("/api/keys");
+            if (res.ok) {
+              const data = await res.json();
+              setKeys(data.keys || []);
+            }
+          } catch (err) {
+            console.error("Failed to save allowed models:", err);
+          }
+        }}
+        activeProviders={keys}
+      />
 
       {/* Confirm Modal */}
       <ConfirmModal
