@@ -65,7 +65,7 @@ export default function ToolDetailClient({ toolId, machineId }) {
     return () => { mounted = false; };
   }, []);
 
-  const getActiveProviders = () => connections.filter(c => c.isActive !== false);
+  const getActiveProviders = () => connections.filter(c => c.isActive !== false && c.isActive !== 0);
 
   const getAllAvailableModels = () => {
     const activeProviders = getActiveProviders();

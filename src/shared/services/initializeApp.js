@@ -111,7 +111,7 @@ async function autoStartMitm() {
     }
 
     const keys = await getApiKeys();
-    const activeKey = keys.find(k => k.isActive !== false);
+    const activeKey = keys.find(k => k.isActive !== false && k.isActive !== 0);
 
     console.log("[InitApp] MITM was enabled, auto-starting...");
     await startMitm(activeKey?.key || "sk_9router", password);

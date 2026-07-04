@@ -41,7 +41,7 @@ export async function POST(request) {
     }
 
     const connections = await getProviderConnections({ provider });
-    const connection = connections.find(c => c.isActive !== false);
+    const connection = connections.find(c => c.isActive !== false && c.isActive !== 0);
     if (!connection) {
       return Response.json({ success: false, error: `No active connection for provider: ${provider}` }, { status: 400 });
     }

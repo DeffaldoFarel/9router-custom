@@ -175,8 +175,8 @@ export default function ConnectionRow({ connection, proxyPools, isOAuth, isFirst
                 Proxy
               </Badge>
             )}
-            {isCooldown && connection.isActive !== false && <CooldownTimer until={modelLockUntil} />}
-            {connection.lastError && connection.isActive !== false && (
+            {isCooldown && connection.isActive !== false && connection.isActive !== 0 && <CooldownTimer until={modelLockUntil} />}
+            {connection.lastError && connection.isActive !== false && connection.isActive !== 0 && (
               <span className="max-w-full truncate text-xs text-red-500 sm:max-w-[300px]" title={connection.lastError}>
                 {connection.lastError}
               </span>

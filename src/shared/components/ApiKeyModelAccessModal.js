@@ -5,11 +5,12 @@ import Modal from "./Modal";
 import Button from "./Button";
 import ModelSelectModal from "./ModelSelectModal";
 import ProviderIcon from "./ProviderIcon";
-import { AI_PROVIDERS, getProviderAlias } from "@/shared/constants/providers";
+import { AI_PROVIDERS, FREE_PROVIDERS, getProviderAlias } from "@/shared/constants/providers";
 
 // Reusable modal for editing API key allowed models.
 // Uses visual model picker (like ComboFormModal) + quick wildcard buttons per provider.
-export default function ApiKeyModelAccessModal({ isOpen, keyName, currentAllowedModels, onClose, onSave, activeProviders = [] }) {
+export default function ApiKeyModelAccessModal({ isOpen, keyName, currentAllowedModels, onClose, onSave, 
+activeProviders = [], allConnections = [] }) {
   const [patterns, setPatterns] = useState([]);
   const [showModelSelect, setShowModelSelect] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -46,6 +47,20 @@ export default function ApiKeyModelAccessModal({ isOpen, keyName, currentAllowed
   // Providers that have models available (connected or no-auth)
   const availableProviders = useMemo(() => {
     const providerIds = new Set(activeProviders.map((p) => p.provider));
+    
+    // Also include noAuth providers that are NOT disabled
+    const disabledNoAuthIds = new Set(
+      allConnections
+        .filter(c => (c.isActive === false || c.isActive === 0) && (AI_PROVIDERS[c.provider]?.noAuth || FREE_PROVIDERS[c.provider]?.noAuth))
+        .map(c => c.provider)
+    );
+    
+    Object.keys(FREE_PROVIDERS).forEach(id => {
+      if (FREE_PROVIDERS[id].noAuth && !disabledNoAuthIds.has(id)) {
+        providerIds.add(id);
+      }
+    });
+
     // Also include providers from patterns that were previously saved
     patterns.forEach((p) => {
       if (p.endsWith("/*")) {
@@ -53,8 +68,8 @@ export default function ApiKeyModelAccessModal({ isOpen, keyName, currentAllowed
         providerIds.add(providerPart);
       }
     });
-    return [...providerIds].filter((id) => AI_PROVIDERS[id]);
-  }, [activeProviders, patterns]);
+      return [...providerIds].filter((id) => AI_PROVIDERS[id] || FREE_PROVIDERS[id]);
+  }, [activeProviders, patterns, allConnections]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -81,7 +96,7 @@ export default function ApiKeyModelAccessModal({ isOpen, keyName, currentAllowed
                   const alias = getProviderAlias(providerId) || providerId;
                   const wildcard = `${alias}/*`;
                   const isAdded = patterns.includes(wildcard);
-                  const info = AI_PROVIDERS[providerId] || { name: providerId, color: "#666" };
+                  const info = AI_PROVIDERS[providerId] || FREE_PROVIDERS[providerId] || { name: providerId, color: "#666" };
                   return (
                     <button
                       key={providerId}
@@ -164,7 +179,8 @@ export default function ApiKeyModelAccessModal({ isOpen, keyName, currentAllowed
         onClose={() => setShowModelSelect(false)}
         onSelect={(model) => addPattern(model.value)}
         onDeselect={(model) => removePattern(model.value)}
-        activeProviders={activeProviders}
+          activeProviders={activeProviders}
+          allConnections={allConnections}
         modelAliases={modelAliases}
         title="Pick Model to Allow"
         addedModelValues={patterns}

@@ -26,8 +26,9 @@ export default function ModelSelectModal({
   onClose,
   onSelect,
   onDeselect,
-  selectedModel,
-  activeProviders = [],
+    selectedModel,
+    activeProviders = [],
+    allConnections = [],
   title = "Select Model",
   modelAliases = {},
   kindFilter = null,
@@ -141,10 +142,17 @@ export default function ModelSelectModal({
     // Get all active provider IDs from connections (filtered by kindFilter if set)
     const activeConnectionIds = filteredActiveProviders.map(p => p.provider);
 
-    // No-auth providers: filter by kindFilter as well
-    const noAuthIds = kindFilter
-      ? NO_AUTH_PROVIDER_IDS.filter((id) => (AI_PROVIDERS[id]?.serviceKinds || ["llm"]).includes(kindFilter))
-      : NO_AUTH_PROVIDER_IDS;
+      // Find disabled noAuth providers so we can exclude them
+      const disabledNoAuthIds = new Set(
+        allConnections
+          .filter(c => (c.isActive === false || c.isActive === 0) && NO_AUTH_PROVIDER_IDS.includes(c.provider))
+          .map(c => c.provider)
+      );
+
+      // No-auth providers: filter by kindFilter as well, and EXCLUDE disabled ones
+      const noAuthIds = (kindFilter
+        ? NO_AUTH_PROVIDER_IDS.filter((id) => (AI_PROVIDERS[id]?.serviceKinds || ["llm"]).includes(kindFilter))
+        : NO_AUTH_PROVIDER_IDS).filter(id => !disabledNoAuthIds.has(id));
 
     // Only show connected providers (including both standard and custom)
     const providerIdsToShow = new Set([
@@ -351,7 +359,7 @@ export default function ModelSelectModal({
     });
 
     return groups;
-  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders]);
+  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, allConnections]);
 
   // Filter combos by search query (and hide combos when kindFilter is set — combos are LLM-only by design)
   // AND filter by allowedModelsFilter if provided

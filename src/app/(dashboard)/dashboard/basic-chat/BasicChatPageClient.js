@@ -221,7 +221,7 @@ export default function BasicChatPageClient() {
         const providersRes = await fetch("/api/providers", { cache: "no-store" });
         const providersData = await providersRes.json().catch(() => ({}));
         const connections = Array.isArray(providersData.connections)
-          ? providersData.connections.filter((connection) => connection?.isActive !== false)
+          ? providersData.connections.filter((connection) => connection?.isActive !== false && connection?.isActive !== 0)
           : [];
 
         if (connections.length === 0) {

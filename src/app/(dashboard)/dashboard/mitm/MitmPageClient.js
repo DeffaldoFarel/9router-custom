@@ -61,7 +61,7 @@ export default function MitmPageClient() {
     } catch { /* ignore */ }
   };
 
-  const getActiveProviders = () => connections.filter(c => c.isActive !== false);
+  const getActiveProviders = () => connections.filter(c => c.isActive !== false && c.isActive !== 0);
 
   const hasActiveProviders = () => {
     const active = getActiveProviders();

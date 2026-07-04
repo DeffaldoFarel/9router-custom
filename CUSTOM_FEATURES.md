@@ -133,6 +133,49 @@ Semua komponen `ToolCard` yang berada di `src/app/(dashboard)/dashboard/cli-tool
 
 ---
 
+## 4. Toggle Disable/Enable untuk noAuth Providers
+
+**Status:** ✅ Implemented
+
+Menambahkan fitur toggle (Enable/Disable) untuk _provider_ yang secara default tidak memerlukan autentikasi (`noAuth: true`), seperti Mimo Code Free dan OpenCode Free. Sebelumnya provider ini di-hardcode selalu aktif dan tombol toggle disembunyikan.
+
+### Fitur Detail
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Dummy Connection Creation** | Membuat entri _connection_ semu di database saat user pertama kali melakukan toggle pada provider _noAuth_ yang belum pernah memiliki koneksi. |
+| **Visible Toggle** | Menampilkan tombol Toggle (Enable/Disable) pada list Provider di halaman Dashboard > Providers. |
+| **Status Badge Update** | Tampilan label status _Disabled_ berfungsi secara normal meskipun provider memiliki flag _noAuth_. |
+| **SQLite Boolean Compatibility** | Memperbaiki filter `isActive` di seluruh aplikasi untuk memperhitungkan nilai `0` (integer) dari SQLite sebagai "non-aktif", selain nilai `false` (boolean). |
+| **Model Filtering** | Provider yang di-disable tidak akan muncul di modal "Pick Model to Allow" dan endpoint `/v1/models`. |
+
+### File yang Dimodifikasi
+
+| File | Perubahan |
+|------|-----------|
+| `src/app/(dashboard)/dashboard/providers/page.js` | Modifikasi `allDisabled` checker dan mengubah fungsi `handleToggleProvider` untuk menangani pembuatan koneksi saat kosong. |
+| `src/app/api/providers/route.js` | Menambahkan validasi untuk provider `noAuth` dan menyimpan `isActive` dari body request. |
+| `src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js` | Filter `activeProviders` untuk memperhitungkan nilai `0` dari SQLite. |
+| `src/app/api/v1/models/route.js` | Filter connections untuk memperhitungkan nilai `0` dari SQLite. |
+| `src/app/(dashboard)/dashboard/cli-tools/[toolId]/ToolDetailClient.js` | Filter `getActiveProviders` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/basic-chat/BasicChatPageClient.js` | Filter connections untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/mitm/MitmPageClient.js` | Filter `getActiveProviders` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/providers/[id]/page.js` | Filter `activeConnection` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/providers/[id]/CompatibleModelsSection.js` | Filter `activeConnection` dan `canImport` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/providers/[id]/ConnectionRow.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/providers/components/ConnectionsCard.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/app/api/models/test/ping.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/app/api/translator/translate/route.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/app/api/translator/send/route.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/GenericExampleCard.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/TtsExampleCard.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/SttExampleCard.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/EmbeddingExampleCard.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/shared/services/initializeApp.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._

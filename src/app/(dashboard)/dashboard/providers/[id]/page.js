@@ -494,7 +494,7 @@ export default function ProviderDetailPage() {
   // Fetch Qoder model list and automatically add to available models
   const handleImportQoderModels = async () => {
     if (importingQoderModels) return;
-    const activeConnection = connections.find((conn) => conn.isActive !== false);
+    const activeConnection = connections.find((conn) => conn.isActive !== false && conn.isActive !== 0);
     if (!activeConnection) {
       alert(translate("Please add an active Qoder connection first"));
       return;
@@ -1104,7 +1104,7 @@ export default function ProviderDetailPage() {
         </button>
 
         {/* Import Qoder models button — only show for qoder provider */}
-        {providerId === "qoder" && connections.some((conn) => conn.isActive !== false) && (
+        {providerId === "qoder" && connections.some((conn) => conn.isActive !== false && conn.isActive !== 0) && (
           <button
             onClick={handleImportQoderModels}
             disabled={importingQoderModels}

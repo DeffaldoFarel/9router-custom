@@ -193,9 +193,11 @@ function comboMatchesKinds(combo, kindFilter) {
  */
 export async function buildModelsList(kindFilter) {
   let connections = [];
+  let dbAvailable = false;
   try {
-    connections = await getProviderConnections();
-    connections = connections.filter(c => c.isActive !== false);
+    const allConnections = await getProviderConnections();
+    dbAvailable = true;
+    connections = allConnections.filter(c => c.isActive !== false && c.isActive !== 0);
   } catch (e) {
     console.log("Could not fetch providers, returning all models");
   }
@@ -235,6 +237,31 @@ export async function buildModelsList(kindFilter) {
       activeConnectionByProvider.set(conn.provider, conn);
     }
   }
+  
+  // Inject noAuth providers if they are not explicitly disabled
+  if (dbAvailable) {
+    const { FREE_PROVIDERS } = require("@/shared/constants/providers");
+    // We need to fetch all connections to know which noAuth providers are explicitly disabled
+    let disabledNoAuthProviders = new Set();
+    try {
+      const allConnections = await getProviderConnections();
+      disabledNoAuthProviders = new Set(
+        allConnections
+          .filter(c => (c.isActive === false || c.isActive === 0) && FREE_PROVIDERS[c.provider]?.noAuth)
+          .map(c => c.provider)
+      );
+    } catch(e) {}
+    
+    Object.keys(FREE_PROVIDERS).forEach(providerId => {
+      if (FREE_PROVIDERS[providerId].noAuth && !disabledNoAuthProviders.has(providerId) && !activeConnectionByProvider.has(providerId)) {
+        activeConnectionByProvider.set(providerId, {
+          provider: providerId,
+          authType: "free",
+          isActive: true
+        });
+      }
+    });
+  }
 
   const models = [];
 
@@ -252,7 +279,8 @@ export async function buildModelsList(kindFilter) {
     models.push(entry);
   }
 
-  if (connections.length === 0) {
+  // If DB is unavailable, fallback to static models. If DB is available but connections is empty, it means all are disabled.
+  if (!dbAvailable) {
     // DB unavailable -> return static models, filtered by per-model kind
     const aliasToProviderId = Object.fromEntries(
       Object.entries(PROVIDER_ID_TO_ALIAS).map(([id, alias]) => [alias, id])

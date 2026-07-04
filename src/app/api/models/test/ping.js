@@ -41,7 +41,7 @@ async function getInternalHeaders() {
   let apiKey = null;
   try {
     const keys = await getApiKeys();
-    apiKey = keys.find((k) => k.isActive !== false)?.key || null;
+    apiKey = keys.find((k) => k.isActive !== false && k.isActive !== 0)?.key || null;
   } catch {}
 
   const headers = { "Content-Type": "application/json" };

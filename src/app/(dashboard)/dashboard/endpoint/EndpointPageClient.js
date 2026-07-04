@@ -20,6 +20,7 @@ import SecurityWarning from "./components/SecurityWarning";
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
   const [activeProviders, setActiveProviders] = useState([]);
+  const [allConnections, setAllConnections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
@@ -268,7 +269,8 @@ export default function APIPageClient({ machineId }) {
       }
       const providersData = await providersRes.json();
       if (providersRes.ok) {
-        setActiveProviders(providersData.connections?.filter(c => c.isActive !== false) || []);
+        setActiveProviders(providersData.connections?.filter(c => c.isActive !== false && c.isActive !== 0) || []);
+        setAllConnections(providersData.connections || []);
       }
     } catch (error) {
       console.log("Error fetching data:", error);
@@ -1328,6 +1330,7 @@ export default function APIPageClient({ machineId }) {
           }
         }}
         activeProviders={activeProviders}
+        allConnections={allConnections}
       />
 
       {/* Confirm Modal */}

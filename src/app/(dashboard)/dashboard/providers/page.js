@@ -166,6 +166,7 @@ export default function ProvidersPage() {
   }, []);
 
   const getProviderStats = (providerId, authType) => {
+    const isNoAuth = FREE_PROVIDERS[providerId]?.noAuth || FREE_TIER_PROVIDERS[providerId]?.noAuth;
     const authTypes = Array.isArray(authType) ? authType : [authType];
     const providerConnections = connections.filter(
       (c) => c.provider === providerId && authTypes.includes(c.authType),
@@ -195,8 +196,8 @@ export default function ProvidersPage() {
 
     const error = errorConns.length;
     const total = providerConnections.length;
-    const allDisabled =
-      total > 0 && providerConnections.every((c) => c.isActive === false);
+    const allDisabled = (total > 0 && providerConnections.every((c) => c.isActive === false)) ||
+        (total === 1 && !!isNoAuth && (providerConnections[0]?.isActive === false || providerConnections[0]?.isActive === 0));
 
     const latestError = errorConns.sort(
       (a, b) => new Date(b.lastErrorAt || 0) - new Date(a.lastErrorAt || 0),
@@ -209,24 +210,57 @@ export default function ProvidersPage() {
     return { connected, error, total, errorCode, errorTime, allDisabled };
   };
 
-  // Toggle all connections for a provider on/off. authType may be a single
-  // string or an array (kiro counts oauth + api_key/apikey together).
-  const handleToggleProvider = async (providerId, authType, newActive) => {
-    const authTypes = Array.isArray(authType) ? authType : [authType];
-    const matches = (c) =>
-      c.provider === providerId && authTypes.includes(c.authType);
-    const providerConns = connections.filter(matches);
-    setConnections((prev) =>
-      prev.map((c) => (matches(c) ? { ...c, isActive: newActive } : c)),
-    );
-    await Promise.allSettled(
-      providerConns.map((c) =>
-        fetch(`/api/providers/${c.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isActive: newActive }),
-        }),
-      ),
+    // Toggle all connections for a provider on/off. authType may be a single
+    // string or an array (kiro counts oauth + api_key/apikey together).
+    const handleToggleProvider = async (providerId, authType, newActive) => {
+      // For noAuth providers without any connections yet, we need to create a dummy one 
+      // in the DB first just to hold the isActive state.
+      const isNoAuth = FREE_PROVIDERS[providerId]?.noAuth || FREE_TIER_PROVIDERS[providerId]?.noAuth;
+      const authTypes = Array.isArray(authType) ? authType : [authType];
+      const matches = (c) =>
+        c.provider === providerId && authTypes.includes(c.authType);
+      const providerConns = connections.filter(matches);
+      
+      if (isNoAuth && providerConns.length === 0) {
+        // Create a connection just to store the disabled state
+        try {
+          const res = await fetch("/api/providers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider: providerId,
+              authType: "free",
+              name: "Default Connection",
+              isActive: newActive,
+              data: JSON.stringify({}),
+            }),
+          });
+          if (res.ok) {
+            // Refresh the connections list
+            const connectionsRes = await fetch("/api/providers");
+            if (connectionsRes.ok) {
+              const connectionsData = await connectionsRes.json();
+              setConnections(connectionsData.connections || []);
+            }
+          }
+          return;
+        } catch (e) {
+          console.error("Failed to toggle noAuth provider", e);
+          return;
+        }
+      }
+
+      setConnections((prev) =>
+        prev.map((c) => (matches(c) ? { ...c, isActive: newActive } : c)),
+      );
+      await Promise.allSettled(
+        providerConns.map((c) =>
+          fetch(`/api/providers/${c.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isActive: newActive }),
+          }),
+        ),
     );
   };
 
@@ -463,28 +497,29 @@ export default function ProvidersPage() {
             {testingMode === "free" ? "Testing..." : "Test All"}
           </button>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-          {freeEntries.map(([key, info]) => {
-            // Kiro accepts both OAuth and api-key connections; count/toggle both
-            // so the card total matches the provider detail page (#kiro-apikey).
-            // Kiro's headless api-key flow persists authType "api_key" (underscore),
-            // while generic apikey providers use "apikey" — include both spellings.
-            const freeAuthTypes =
-              key === "kiro" ? ["oauth", "apikey", "api_key"] : "oauth";
-            return (
-              <ProviderCard
-                key={key}
-                providerId={key}
-                provider={info}
-                stats={getProviderStats(key, freeAuthTypes)}
-                authType="free"
-                onToggle={(active) =>
-                  handleToggleProvider(key, freeAuthTypes, active)
-                }
-              />
-            );
-          })}
-          {freeTierEntries.map(([key, info]) => (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            {freeEntries.map(([key, info]) => {
+              // Kiro accepts both OAuth and api-key connections; count/toggle both
+              // so the card total matches the provider detail page (#kiro-apikey).
+              // Kiro's headless api-key flow persists authType "api_key" (underscore),
+              // while generic apikey providers use "apikey" – include both spellings.
+              // For purely noAuth providers like Mimo Code Free / OpenCode Free, authType is "free".
+              const freeAuthTypes =
+                key === "kiro" ? ["oauth", "apikey", "api_key"] : (info.noAuth ? "free" : "oauth");
+              return (
+                <ProviderCard
+                  key={key}
+                  providerId={key}
+                  provider={info}
+                  stats={getProviderStats(key, freeAuthTypes)}
+                  authType="free"
+                  onToggle={(active) =>
+                    handleToggleProvider(key, freeAuthTypes, active)
+                  }
+                />
+              );
+            })}
+            {freeTierEntries.map(([key, info]) => (
             <ApiKeyProviderCard
               key={key}
               providerId={key}
@@ -642,70 +677,72 @@ function ProviderCard({ providerId, provider, stats, authType, onToggle }) {
         padding="xs"
         className={`h-full hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors cursor-pointer ${allDisabled ? "opacity-50" : ""}`}
       >
-        <div className="flex min-w-0 items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div
-              className="size-8 shrink-0 rounded-lg flex items-center justify-center"
-              style={{
-                backgroundColor: `${provider.color?.length > 7 ? provider.color : provider.color + "15"}`,
-              }}
-            >
-              <ProviderIcon
-                src={`/providers/${provider.id}.png`}
-                alt={provider.name}
-                size={30}
-                className="object-contain rounded-lg max-w-[32px] max-h-[32px]"
-                fallbackText={
-                  provider.textIcon || provider.id.slice(0, 2).toUpperCase()
-                }
-                fallbackColor={provider.color}
-              />
-            </div>
-            <div className="min-w-0">
-              <h3 className="truncate font-semibold">{provider.name}</h3>
-              <div className="flex min-w-0 items-center gap-1.5 text-xs flex-wrap">
-                {allDisabled ? (
-                  <Badge variant="default" size="sm">
-                    <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[12px]">
-                        pause_circle
-                      </span>
-                      Disabled
-                    </span>
-                  </Badge>
-                ) : isNoAuth ? (
-                  <Badge variant="success" size="sm" dot>Ready</Badge>
-                ) : (
-                  <>
-                    {getStatusDisplay(connected, error, errorCode)}
-                    {errorTime && (
-                      <span className="text-text-muted">{errorTime}</span>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {stats.total > 0 && (
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div
-                className="opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onToggle(!allDisabled ? false : true);
+                className="size-8 shrink-0 rounded-lg flex items-center justify-center"
+                style={{
+                  backgroundColor: `${provider.color?.length > 7 ? provider.color : provider.color + "15"}`,
                 }}
               >
-                <Toggle
-                  size="sm"
-                  checked={!allDisabled}
-                  onChange={() => {}}
-                  title={allDisabled ? "Enable provider" : "Disable provider"}
+                <ProviderIcon
+                  src={`/providers/${provider.id}.png`}
+                  alt={provider.name}
+                  size={30}
+                  className="object-contain rounded-lg max-w-[32px] max-h-[32px]"
+                  fallbackText={
+                    provider.textIcon || provider.id.slice(0, 2).toUpperCase()
+                  }
+                  fallbackColor={provider.color}
                 />
               </div>
-            )}
+              <div className="min-w-0">
+                <h3 className="truncate font-semibold">{provider.name}</h3>
+                <div className="flex min-w-0 items-center gap-1.5 text-xs flex-wrap">
+                  {allDisabled ? (
+                    <Badge variant="default" size="sm">
+                      <span className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px]">
+                          pause_circle
+                        </span>
+                        Disabled
+                      </span>
+                    </Badge>
+                  ) : isNoAuth ? (
+                    <Badge variant="success" size="sm" dot>Ready</Badge>
+                  ) : (
+                    <>
+                      {getStatusDisplay(connected, error, errorCode)}
+                      {errorTime && (
+                        <span className="text-text-muted">{errorTime}</span>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 z-10 relative">
+              {((stats.total > 0) || isNoAuth) && (
+                <div
+                  className="opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onToggle) onToggle(!allDisabled ? false : true);
+                  }}
+                >
+                  <Toggle
+                    size="sm"
+                    checked={!allDisabled}
+                    onChange={(checked) => {
+                      if (onToggle) onToggle(checked);
+                    }}
+                    title={allDisabled ? "Enable provider" : "Disable provider"}
+                  />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
       </Card>
     </Link>
   );
@@ -824,25 +861,27 @@ function ApiKeyProviderCard({
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {stats.total > 0 && (
-              <div
-                className="opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onToggle(!allDisabled ? false : true);
-                }}
-              >
-                <Toggle
-                  size="sm"
-                  checked={!allDisabled}
-                  onChange={() => {}}
-                  title={allDisabled ? "Enable provider" : "Disable provider"}
-                />
-              </div>
-            )}
-          </div>
+            <div className="flex shrink-0 items-center gap-2 z-10 relative">
+              {stats.total > 0 && (
+                <div
+                  className="opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (onToggle) onToggle(!allDisabled ? false : true);
+                  }}
+                >
+                  <Toggle
+                    size="sm"
+                    checked={!allDisabled}
+                    onChange={(checked) => {
+                      if (onToggle) onToggle(checked);
+                    }}
+                    title={allDisabled ? "Enable provider" : "Disable provider"}
+                  />
+                </div>
+              )}
+            </div>
         </div>
       </Card>
     </Link>

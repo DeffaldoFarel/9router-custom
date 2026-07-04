@@ -177,7 +177,7 @@ export default function CompatibleModelsSection({ providerStorageAlias, provider
 
   const handleImport = async () => {
     if (importing) return;
-    const activeConnection = connections.find((conn) => conn.isActive !== false);
+    const activeConnection = connections.find((conn) => conn.isActive !== false && conn.isActive !== 0);
     if (!activeConnection) return;
 
     setImporting(true);
@@ -211,7 +211,7 @@ export default function CompatibleModelsSection({ providerStorageAlias, provider
     }
   };
 
-  const canImport = connections.some((conn) => conn.isActive !== false);
+  const canImport = connections.some((conn) => conn.isActive !== false && conn.isActive !== 0);
 
   return (
     <div className="flex flex-col gap-4">

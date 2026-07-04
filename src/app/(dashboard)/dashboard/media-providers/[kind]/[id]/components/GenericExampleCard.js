@@ -73,7 +73,7 @@ export function GenericExampleCard({ providerId, kind }) {
     setLocalEndpoint(window.location.origin);
     fetch("/api/keys")
       .then((r) => r.json())
-      .then((d) => { setApiKey((d.keys || []).find((k) => k.isActive !== false)?.key || ""); })
+      .then((d) => { setApiKey((d.keys || []).find((k) => k.isActive !== false && k.isActive !== 0)?.key || ""); })
       .catch(() => {});
     fetch("/api/tunnel/status")
       .then((r) => r.json())
@@ -83,7 +83,7 @@ export function GenericExampleCard({ providerId, kind }) {
     fetch("/api/providers/client")
       .then((r) => r.json())
       .then((d) => {
-        const conns = (d.connections || []).filter((c) => c.provider === providerId && c.isActive !== false);
+        const conns = (d.connections || []).filter((c) => c.provider === providerId && c.isActive !== false && c.isActive !== 0);
         setConnections(conns);
       })
       .catch(() => {});
