@@ -173,6 +173,8 @@ Menambahkan fitur toggle (Enable/Disable) untuk _provider_ yang secara default t
 | `src/app/(dashboard)/dashboard/media-providers/[kind]/[id]/components/EmbeddingExampleCard.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
 | `src/app/(dashboard)/dashboard/media-providers/combo/[id]/page.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
 | `src/shared/services/initializeApp.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
+| `src/shared/components/UsageStats.js` | Memfilter provider `noAuth` yang sudah di-disable agar tidak muncul di bagan/flow topology pada halaman Usage. |
+| `src/sse/services/auth.js` | Mencegah injeksi virtual connection apabila provider `noAuth` secara eksplisit telah dinonaktifkan di database, sehingga benar-benar memblokir eksekusi API/chat. |
 
 ---
 

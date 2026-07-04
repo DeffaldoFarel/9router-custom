@@ -231,8 +231,14 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
           nodeNameMap[node.id] = node.name;
         }
         const seen = new Set();
+        const disabledNoAuth = new Set();
         const unique = (d?.connections || []).filter((c) => {
-          if (c.isActive === false) return false;
+          if (c.isActive === false || c.isActive === 0) {
+            if (FREE_PROVIDERS[c.provider]?.noAuth || AI_PROVIDERS[c.provider]?.noAuth) {
+              disabledNoAuth.add(c.provider);
+            }
+            return false;
+          }
           if (!isLLMProvider(c.provider)) return false;
           if (seen.has(c.provider)) return false;
           seen.add(c.provider);
@@ -242,7 +248,7 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
           nodeName: nodeNameMap[c.provider] || null,
         }));
         const noAuthProviders = Object.values(FREE_PROVIDERS)
-          .filter((p) => p.noAuth && !seen.has(p.id) && isLLMProvider(p.id))
+          .filter((p) => p.noAuth && !seen.has(p.id) && !disabledNoAuth.has(p.id) && isLLMProvider(p.id))
           .map((p) => ({ provider: p.id, name: p.name }));
         setProviders([...unique, ...noAuthProviders]);
       })

@@ -34,6 +34,11 @@ export async function getProviderCredentials(provider, excludeConnectionIds = nu
 
     // Inject a virtual connection for no-auth free providers (with optional proxy pool from settings)
     if (FREE_PROVIDERS[providerId]?.noAuth) {
+      const existingConns = await getProviderConnections({ provider: providerId });
+      if (existingConns.some(c => c.isActive === false || c.isActive === 0)) {
+        log.warn("AUTH", `Provider ${providerId} is explicitly disabled`);
+        return null;
+      }
       const settings = await getSettings();
       const override = (settings.providerStrategies || {})[providerId] || {};
       const resolvedProxy = await resolveConnectionProxyConfig({ proxyPoolId: override.proxyPoolId || "" });
