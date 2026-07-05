@@ -269,10 +269,9 @@ export default function APIPageClient({ machineId }) {
 
   const fetchData = async () => {
     try {
-      const [keysRes, providersRes, modelsRes] = await Promise.all([
+      const [keysRes, providersRes] = await Promise.all([
         fetch("/api/keys"),
         fetch("/api/providers"),
-        fetch("/api/v1/models"),
       ]);
       const keysData = await keysRes.json();
       if (keysRes.ok) {
@@ -282,10 +281,6 @@ export default function APIPageClient({ machineId }) {
       if (providersRes.ok) {
         setActiveProviders(providersData.connections?.filter(c => c.isActive !== false && c.isActive !== 0) || []);
         setAllConnections(providersData.connections || []);
-      }
-      if (modelsRes.ok) {
-        const modelsData = await modelsRes.json();
-        setAvailableModels(modelsData.data || []);
       }
     } catch (error) {
       console.log("Error fetching data:", error);
@@ -726,10 +721,35 @@ export default function APIPageClient({ machineId }) {
     }
   }, []);
 
+  const fetchAvailableModels = useCallback(async (apiKey = "") => {
+    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+    const endpoints = ["/api/v1/models", "/v1/models"];
+    for (const endpoint of endpoints) {
+      try {
+        const res = await fetch(endpoint, { headers, cache: "no-store" });
+        if (!res.ok) continue;
+        const data = await res.json();
+        const models = Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data?.models)
+            ? data.models.map((m) => ({ id: m.fullModel || m.id || `${m.provider}/${m.model}` }))
+            : [];
+        if (models.length > 0) {
+          setAvailableModels(models.filter((m) => m?.id));
+          return;
+        }
+      } catch { /* try next endpoint */ }
+    }
+    setAvailableModels([]);
+  }, []);
+
   const activeKeys = useMemo(
     () => keys.filter((key) => key.isActive !== false && key.isActive !== 0),
     [keys]
   );
+  useEffect(() => {
+    fetchAvailableModels("");
+  }, [fetchAvailableModels]);
   const selectedTestKey = useMemo(
     () => activeKeys.find((key) => key.id === testKeyId) || activeKeys[0] || null,
     [activeKeys, testKeyId]

@@ -1,6 +1,7 @@
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS, getModelKind } from "@/shared/constants/models";
 import {
   AI_PROVIDERS,
+  FREE_PROVIDERS,
   getProviderAlias,
   isAnthropicCompatibleProvider,
   isOpenAICompatibleProvider,
@@ -240,7 +241,6 @@ export async function buildModelsList(kindFilter) {
   
   // Inject noAuth providers if they are not explicitly disabled
   if (dbAvailable) {
-    const { FREE_PROVIDERS } = require("@/shared/constants/providers");
     // We need to fetch all connections to know which noAuth providers are explicitly disabled
     let disabledNoAuthProviders = new Set();
     try {
