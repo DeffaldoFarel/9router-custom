@@ -6,7 +6,7 @@ import {
   isAnthropicCompatibleProvider,
   isOpenAICompatibleProvider,
 } from "@/shared/constants/providers";
-import { getProviderConnections, getCombos, getCustomModels, getModelAliases } from "@/lib/localDb";
+import { getProviderConnections, getCombos, getCustomModels, getModelAliases } from "@/models";
 import { getDisabledModels } from "@/lib/disabledModelsDb";
 import { resolveKiroModels } from "open-sse/services/kiroModels.js";
 import { resolveKimchiModels } from "open-sse/services/kimchiModels.js";
@@ -200,7 +200,7 @@ export async function buildModelsList(kindFilter) {
     dbAvailable = true;
     connections = allConnections.filter(c => c.isActive !== false && c.isActive !== 0);
   } catch (e) {
-    console.log("Could not fetch providers, returning all models");
+    console.error("Could not fetch providers, returning all models", e);
   }
 
   let combos = [];
