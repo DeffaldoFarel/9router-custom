@@ -18,7 +18,8 @@ Setiap API Key dapat dikonfigurasi untuk membatasi model mana saja yang bisa dia
 | **Visual Model Picker** | Modal dengan UI visual untuk pilih model, mirip dengan "Add Model to Combo" |
 | **Quick Add Provider** | Tombol per-provider aktif untuk quick add wildcard (e.g., `anthropic/*`), termasuk custom provider/prefix dan mengecualikan provider yang disabled. |
 | **Clear All** | Tombol untuk mengosongkan seluruh allowed patterns sekaligus dari modal. |
-| **Allowed Count Badge** | Menampilkan jumlah model yang diizinkan di setiap API Key, misalnya `All 100 Models` atau `12 of 100 Models`. |
+| **Allowed Count Badge** | Menampilkan jumlah model yang diizinkan di setiap API Key, misalnya `All 100 Models` atau `12 of 100 Models`, dihitung dari logic `ModelSelectModal` agar sinkron dengan modal "Pick Model to Allow". |
+| **Unavailable Pattern Marker** | Pattern lama tetap disimpan, tetapi diberi label jelas seperti `Provider disabled`, `Provider unavailable`, atau `Model unavailable` jika provider/model sudah tidak aktif/terhapus. |
 | **404 Response** | Jika model tidak diizinkan, return 404 "Model not found" (bukan 403 "Not allowed") |
 | **Models Endpoint Filter** | `GET /v1/models` hanya return model yang diizinkan untuk API Key tersebut |
 | **Combo Filtering** | Combo models juga difilter berdasarkan allowed models |

@@ -704,7 +704,18 @@ export default function APIPageClient({ machineId }) {
   };
 
   const handleModelsCalculated = useCallback((data) => {
-    setExactAvailableModels(data);
+    setExactAvailableModels((prev) => {
+      const nextModelIds = data.modelIds || [];
+      const prevModelIds = prev.modelIds || [];
+      if (
+        prev.total === data.total &&
+        prevModelIds.length === nextModelIds.length &&
+        prevModelIds.every((id, index) => id === nextModelIds[index])
+      ) {
+        return prev;
+      }
+      return { total: data.total || 0, modelIds: nextModelIds };
+    });
   }, []);
 
   const toggleKeyVisibility = (keyId) => {

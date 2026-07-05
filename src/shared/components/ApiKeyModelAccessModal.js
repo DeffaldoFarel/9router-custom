@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Modal from "./Modal";
 import Button from "./Button";
 import ModelSelectModal from "./ModelSelectModal";
@@ -15,6 +15,7 @@ activeProviders = [], allConnections = [] }) {
   const [showModelSelect, setShowModelSelect] = useState(false);
   const [saving, setSaving] = useState(false);
   const [modelAliases, setModelAliases] = useState({});
+  const [availableModelIds, setAvailableModelIds] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -83,11 +84,56 @@ activeProviders = [], allConnections = [] }) {
     return [...providerMap.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [activeProviders, allConnections]);
 
+  const patternStatuses = useMemo(() => {
+    const activeAliases = new Set(availableProviders.map((provider) => provider.alias));
+    const disabledAliases = new Set();
+
+    for (const conn of allConnections) {
+      if (!conn?.provider) continue;
+      const alias = conn.providerSpecificData?.prefix || getProviderAlias(conn.provider) || conn.provider;
+      if (conn.isActive === false || conn.isActive === 0) disabledAliases.add(alias);
+    }
+
+    const availableIds = new Set(availableModelIds);
+    const statuses = new Map();
+
+    for (const pattern of patterns) {
+      if (pattern === "*") continue;
+
+      if (pattern.endsWith("/*")) {
+        const alias = pattern.slice(0, -2);
+        if (activeAliases.has(alias)) continue;
+        statuses.set(pattern, disabledAliases.has(alias) ? "Provider disabled" : "Provider unavailable");
+        continue;
+      }
+
+      if (availableIds.has(pattern)) continue;
+      const slashIndex = pattern.indexOf("/");
+      if (slashIndex === -1) {
+        statuses.set(pattern, "Combo/model unavailable");
+        continue;
+      }
+
+      const alias = pattern.slice(0, slashIndex);
+      if (!activeAliases.has(alias)) {
+        statuses.set(pattern, disabledAliases.has(alias) ? "Provider disabled" : "Provider unavailable");
+      } else {
+        statuses.set(pattern, "Model unavailable");
+      }
+    }
+
+    return statuses;
+  }, [allConnections, availableModelIds, availableProviders, patterns]);
+
   const handleSave = async () => {
     setSaving(true);
     await onSave(patterns);
     setSaving(false);
   };
+
+  const handleModelsCalculated = useCallback((data) => {
+    setAvailableModelIds(data.modelIds || []);
+  }, []);
 
   return (
     <>
@@ -151,6 +197,14 @@ activeProviders = [], allConnections = [] }) {
                   <div key={index} className="group flex min-w-0 items-center gap-2 rounded-md bg-black/[0.02] px-2 py-1.5 transition-colors hover:bg-black/[0.04] dark:bg-white/[0.02] dark:hover:bg-white/[0.04]">
                     <span className="text-[10px] font-medium text-text-muted w-3 text-center shrink-0">{index + 1}</span>
                     <code className="min-w-0 flex-1 truncate font-mono text-xs text-text-main">{pattern}</code>
+                    {patternStatuses.has(pattern) && (
+                      <span
+                        className="shrink-0 rounded-full border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-medium text-orange-500"
+                        title="This saved allowed pattern no longer points to an active selectable model/provider. It will work again if the provider/model is restored."
+                      >
+                        {patternStatuses.get(pattern)}
+                      </span>
+                    )}
                     <button onClick={() => removePatternAt(index)} className="p-0.5 hover:bg-red-500/10 rounded text-text-muted hover:text-red-500 transition-all shrink-0" title="Remove">
                       <span className="material-symbols-outlined text-[14px]">close</span>
                     </button>
@@ -202,6 +256,7 @@ activeProviders = [], allConnections = [] }) {
         title="Pick Model to Allow"
         addedModelValues={patterns}
         closeOnSelect={false}
+        onModelsCalculated={handleModelsCalculated}
       />
     </>
   );

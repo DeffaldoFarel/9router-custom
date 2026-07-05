@@ -37,6 +37,7 @@ export default function ModelSelectModal({
   allowedModelsFilter = [],
   onModelsCalculated = null, // Callback to report the final calculated models back to parent
 }) {
+  const shouldFetchModalData = isOpen || Boolean(onModelsCalculated);
   // Filter activeProviders by serviceKinds when kindFilter set (e.g. "webSearch", "webFetch")
   const filteredActiveProviders = useMemo(() => {
     const activeOnly = activeProviders.filter((p) => p.isActive !== false && p.isActive !== 0);
@@ -67,8 +68,8 @@ export default function ModelSelectModal({
   };
 
   useEffect(() => {
-    if (isOpen || onModelsCalculated) fetchCombos();
-  }, [isOpen, onModelsCalculated]);
+    if (shouldFetchModalData) fetchCombos();
+  }, [shouldFetchModalData]);
 
   const fetchProviderNodes = async () => {
     try {
@@ -83,8 +84,8 @@ export default function ModelSelectModal({
   };
 
   useEffect(() => {
-    if (isOpen || onModelsCalculated) fetchProviderNodes();
-  }, [isOpen, onModelsCalculated]);
+    if (shouldFetchModalData) fetchProviderNodes();
+  }, [shouldFetchModalData]);
 
   const fetchCustomModels = async () => {
     try {
@@ -99,8 +100,8 @@ export default function ModelSelectModal({
   };
 
   useEffect(() => {
-    if (isOpen || onModelsCalculated) fetchCustomModels();
-  }, [isOpen, onModelsCalculated]);
+    if (shouldFetchModalData) fetchCustomModels();
+  }, [shouldFetchModalData]);
 
   const fetchDisabledModels = async () => {
     try {
@@ -115,8 +116,8 @@ export default function ModelSelectModal({
   };
 
   useEffect(() => {
-    if (isOpen || onModelsCalculated) fetchDisabledModels();
-  }, [isOpen, onModelsCalculated]);
+    if (shouldFetchModalData) fetchDisabledModels();
+  }, [shouldFetchModalData]);
 
   const allProviders = useMemo(() => ({ ...OAUTH_PROVIDERS, ...FREE_PROVIDERS, ...FREE_TIER_PROVIDERS, ...APIKEY_PROVIDERS }), []);
 
