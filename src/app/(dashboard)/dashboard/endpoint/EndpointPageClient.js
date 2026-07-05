@@ -703,6 +703,10 @@ export default function APIPageClient({ machineId }) {
     return `${count} of ${labelTotal}`;
   };
 
+  const handleModelsCalculated = useCallback((data) => {
+    setExactAvailableModels(data);
+  }, []);
+
   const toggleKeyVisibility = (keyId) => {
     setVisibleKeys(prev => {
       const next = new Set(prev);
@@ -721,33 +725,11 @@ export default function APIPageClient({ machineId }) {
     }
   }, []);
 
-  const fetchExactAvailableModels = useCallback(async () => {
-    try {
-      const res = await fetch("/api/models/available", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.models && Array.isArray(data.models)) {
-          setExactAvailableModels({
-            total: data.models.length,
-            modelIds: data.models.map(m => m.id)
-          });
-          return;
-        }
-      }
-    } catch (e) {
-      console.error("Failed to fetch available models", e);
-    }
-    setExactAvailableModels({ total: 0, modelIds: [] });
-  }, []);
-
   const activeKeys = useMemo(
     () => keys.filter((key) => key.isActive !== false && key.isActive !== 0),
     [keys]
   );
 
-  useEffect(() => {
-    fetchExactAvailableModels();
-  }, [fetchExactAvailableModels]);
   const selectedTestKey = useMemo(
     () => activeKeys.find((key) => key.id === testKeyId) || activeKeys[0] || null,
     [activeKeys, testKeyId]
@@ -1566,6 +1548,15 @@ export default function APIPageClient({ machineId }) {
         title="Select Model for cURL Test"
         addedModelValues={testModel ? [testModel] : []}
         allowedModelsFilter={selectedTestKey?.allowedModels || []}
+      />
+
+      <ModelSelectModal
+        isOpen={false}
+        onClose={() => {}}
+        onSelect={() => {}}
+        activeProviders={activeProviders}
+        allConnections={allConnections}
+        onModelsCalculated={handleModelsCalculated}
       />
 
       {/* Confirm Modal */}
