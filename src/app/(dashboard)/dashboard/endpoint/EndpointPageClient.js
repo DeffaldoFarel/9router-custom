@@ -721,24 +721,18 @@ export default function APIPageClient({ machineId }) {
     }
   }, []);
 
-  const fetchAvailableModels = useCallback(async (apiKey = "") => {
-    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
-    const endpoints = ["/api/v1/models", "/v1/models"];
-    for (const endpoint of endpoints) {
-      try {
-        const res = await fetch(endpoint, { headers, cache: "no-store" });
-        if (!res.ok) continue;
+  const fetchAvailableModels = useCallback(async () => {
+    try {
+      const res = await fetch("/api/models/available", { cache: "no-store" });
+      if (res.ok) {
         const data = await res.json();
-        const models = Array.isArray(data?.data)
-          ? data.data
-          : Array.isArray(data?.models)
-            ? data.models.map((m) => ({ id: m.fullModel || m.id || `${m.provider}/${m.model}` }))
-            : [];
-        if (models.length > 0) {
-          setAvailableModels(models.filter((m) => m?.id));
+        if (data.models && Array.isArray(data.models)) {
+          setAvailableModels(data.models.filter(m => m?.id));
           return;
         }
-      } catch { /* try next endpoint */ }
+      }
+    } catch (e) {
+      console.error("Failed to fetch available models", e);
     }
     setAvailableModels([]);
   }, []);
@@ -748,7 +742,7 @@ export default function APIPageClient({ machineId }) {
     [keys]
   );
   useEffect(() => {
-    fetchAvailableModels("");
+    fetchAvailableModels();
   }, [fetchAvailableModels]);
   const selectedTestKey = useMemo(
     () => activeKeys.find((key) => key.id === testKeyId) || activeKeys[0] || null,
