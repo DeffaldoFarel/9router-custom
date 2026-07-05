@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
-import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal, ApiKeyModelAccessModal } from "@/shared/components";
+import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal, ApiKeyModelAccessModal, ModelSelectModal } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import {
   TUNNEL_BENEFITS,
@@ -17,8 +17,10 @@ import EndpointRow from "./components/EndpointRow";
 import StatusAlert from "./components/StatusAlert";
 import Tooltip from "./components/Tooltip";
 import SecurityWarning from "./components/SecurityWarning";
+import { isModelAllowed } from "@/lib/modelMatcher";
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
+  const [availableModels, setAvailableModels] = useState([]);
   const [activeProviders, setActiveProviders] = useState([]);
   const [allConnections, setAllConnections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +82,14 @@ export default function APIPageClient({ machineId }) {
 
   // API key visibility toggle state
   const [visibleKeys, setVisibleKeys] = useState(new Set());
+  const [testMode, setTestMode] = useState("models");
+  const [testKeyId, setTestKeyId] = useState("");
+  const [testModel, setTestModel] = useState("");
+  const [testPrompt, setTestPrompt] = useState("Say hello in one sentence.");
+  const [showTestModelSelect, setShowTestModelSelect] = useState(false);
+  const [testRunning, setTestRunning] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testError, setTestError] = useState("");
 
   // Client-side local/remote detection (UI hint only, not a security gate)
   const [isRemoteHost, setIsRemoteHost] = useState(false);
@@ -259,9 +269,10 @@ export default function APIPageClient({ machineId }) {
 
   const fetchData = async () => {
     try {
-      const [keysRes, providersRes] = await Promise.all([
+      const [keysRes, providersRes, modelsRes] = await Promise.all([
         fetch("/api/keys"),
         fetch("/api/providers"),
+        fetch("/api/v1/models"),
       ]);
       const keysData = await keysRes.json();
       if (keysRes.ok) {
@@ -271,6 +282,10 @@ export default function APIPageClient({ machineId }) {
       if (providersRes.ok) {
         setActiveProviders(providersData.connections?.filter(c => c.isActive !== false && c.isActive !== 0) || []);
         setAllConnections(providersData.connections || []);
+      }
+      if (modelsRes.ok) {
+        const modelsData = await modelsRes.json();
+        setAvailableModels(modelsData.data || []);
       }
     } catch (error) {
       console.log("Error fetching data:", error);
@@ -684,6 +699,15 @@ export default function APIPageClient({ machineId }) {
     return fullKey.slice(0, 6) + "•".repeat(fullKey.length - 10) + fullKey.slice(-4);
   };
 
+  const getAllowedModelsLabel = (key) => {
+    const total = availableModels.length;
+    const labelTotal = `${total} Model${total === 1 ? "" : "s"}`;
+    const allowed = Array.isArray(key.allowedModels) ? key.allowedModels : [];
+    if (allowed.length === 0 || allowed.includes("*")) return `All ${labelTotal}`;
+    const count = availableModels.filter((model) => isModelAllowed(allowed, model.id)).length;
+    return `${count} of ${labelTotal}`;
+  };
+
   const toggleKeyVisibility = (keyId) => {
     setVisibleKeys(prev => {
       const next = new Set(prev);
@@ -701,6 +725,67 @@ export default function APIPageClient({ machineId }) {
       setBaseUrl(`${window.location.origin}/v1`);
     }
   }, []);
+
+  const activeKeys = useMemo(
+    () => keys.filter((key) => key.isActive !== false && key.isActive !== 0),
+    [keys]
+  );
+  const selectedTestKey = useMemo(
+    () => activeKeys.find((key) => key.id === testKeyId) || activeKeys[0] || null,
+    [activeKeys, testKeyId]
+  );
+
+  const escapeCurlSingleQuote = (value) => String(value).replace(/'/g, "'\\''");
+  const testPath = testMode === "models" ? "/models" : "/chat/completions";
+  const testUrl = `${baseUrl}${testPath}`;
+  const completionBody = useMemo(() => ({
+    model: testModel || "provider/model",
+    messages: [{ role: "user", content: testPrompt }],
+    max_tokens: 64,
+  }), [testModel, testPrompt]);
+  const generatedCurl = useMemo(() => {
+    const authLine = selectedTestKey ? ` \\\n+  -H 'Authorization: Bearer ${selectedTestKey.key}'` : "";
+    if (testMode === "models") {
+      return `curl '${testUrl}'${authLine}`;
+    }
+    return `curl '${testUrl}' \\\n+  -H 'Content-Type: application/json'${authLine} \\\n+  -d '${escapeCurlSingleQuote(JSON.stringify(completionBody, null, 2))}'`;
+  }, [completionBody, selectedTestKey, testMode, testUrl]);
+  const cleanGeneratedCurl = generatedCurl.replace(/\n\+/g, "\n");
+
+  const runCurlTest = async () => {
+    if (!selectedTestKey && requireApiKey) {
+      setTestError("Select an active API key first.");
+      setTestResult(null);
+      return;
+    }
+    if (testMode === "completions" && !testModel) {
+      setTestError("Select a model first.");
+      setTestResult(null);
+      return;
+    }
+    setTestRunning(true);
+    setTestError("");
+    setTestResult(null);
+    try {
+      const headers = selectedTestKey ? { Authorization: `Bearer ${selectedTestKey.key}` } : {};
+      const res = await fetch(testPath.replace(/^\//, "/v1/"), testMode === "models" ? {
+        method: "GET",
+        headers,
+      } : {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify(completionBody),
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = text; }
+      setTestResult({ status: res.status, ok: res.ok, data });
+    } catch (error) {
+      setTestError(error.message || "Request failed");
+    } finally {
+      setTestRunning(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -1041,6 +1126,9 @@ export default function APIPageClient({ machineId }) {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center whitespace-nowrap rounded-full border border-primary/20 bg-primary/5 px-2 py-1 text-[11px] font-medium text-primary" title="Allowed models for this API key">
+                    {getAllowedModelsLabel(key)}
+                  </span>
                   <Toggle
                     size="sm"
                     checked={key.isActive ?? true}
@@ -1078,6 +1166,118 @@ export default function APIPageClient({ machineId }) {
             ))}
           </div>
         )}
+      </Card>
+
+      {/* cURL Test */}
+      <Card>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">terminal</span>
+                cURL Test
+              </h2>
+              <p className="text-sm text-text-muted mt-1">
+                Generate and run quick tests for <code className="font-mono">/v1/models</code> and <code className="font-mono">/v1/chat/completions</code>.
+              </p>
+            </div>
+            <div className="inline-flex rounded-lg border border-border bg-bg p-1">
+              <button
+                onClick={() => { setTestMode("models"); setTestError(""); setTestResult(null); }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${testMode === "models" ? "bg-primary text-white" : "text-text-muted hover:text-text-main"}`}
+              >
+                /models
+              </button>
+              <button
+                onClick={() => { setTestMode("completions"); setTestError(""); setTestResult(null); }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${testMode === "completions" ? "bg-primary text-white" : "text-text-muted hover:text-text-main"}`}
+              >
+                /completions
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">API Key</label>
+              <select
+                value={selectedTestKey?.id || ""}
+                onChange={(e) => { setTestKeyId(e.target.value); setTestResult(null); setTestError(""); }}
+                className="w-full rounded-lg border border-border bg-input px-3 py-2 text-sm outline-none focus:border-primary"
+              >
+                {activeKeys.length === 0 ? (
+                  <option value="">No active API keys</option>
+                ) : activeKeys.map((key) => (
+                  <option key={key.id} value={key.id}>{key.name} ({maskKey(key.key)})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Endpoint</label>
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-input px-3 py-2">
+                <code className="min-w-0 flex-1 truncate text-sm font-mono text-text-muted">{testUrl}</code>
+                <button onClick={() => copy(testUrl, "test_endpoint_url")} className="text-text-muted hover:text-primary" title="Copy endpoint URL">
+                  <span className="material-symbols-outlined text-[16px]">{copied === "test_endpoint_url" ? "check" : "content_copy"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {testMode === "completions" && (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="text-sm font-medium mb-1.5 block">Model</label>
+                <button
+                  onClick={() => setShowTestModelSelect(true)}
+                  className="w-full rounded-lg border border-border bg-input px-3 py-2 text-left text-sm font-mono text-text-main transition-colors hover:border-primary/50"
+                >
+                  {testModel || <span className="text-text-muted">Select a model</span>}
+                </button>
+              </div>
+              <Input
+                label="Prompt"
+                value={testPrompt}
+                onChange={(e) => setTestPrompt(e.target.value)}
+                placeholder="Say hello in one sentence."
+              />
+            </div>
+          )}
+
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-sm font-medium">Generated curl</label>
+              <button
+                onClick={() => copy(cleanGeneratedCurl, "test_curl")}
+                className="flex items-center gap-1 text-xs text-text-muted hover:text-primary"
+              >
+                <span className="material-symbols-outlined text-[14px]">{copied === "test_curl" ? "check" : "content_copy"}</span>
+                {copied === "test_curl" ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <pre className="max-h-[260px] overflow-auto rounded-lg border border-border bg-black/[0.03] p-3 text-xs text-text-main dark:bg-white/[0.03]"><code>{cleanGeneratedCurl}</code></pre>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button onClick={runCurlTest} disabled={testRunning || (requireApiKey && !selectedTestKey)} icon={testRunning ? "progress_activity" : "play_arrow"}>
+              {testRunning ? "Running..." : `Run ${testMode === "models" ? "/models" : "/completions"} Test`}
+            </Button>
+            {requireApiKey && !selectedTestKey && (
+              <p className="text-xs text-orange-500">Create or resume an API key before testing.</p>
+            )}
+          </div>
+
+          {(testError || testResult) && (
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Result</label>
+              {testError ? (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-sm text-red-500">{testError}</div>
+              ) : (
+                <pre className={`max-h-[320px] overflow-auto rounded-lg border p-3 text-xs ${testResult.ok ? "border-green-500/30 bg-green-500/5" : "border-red-500/30 bg-red-500/5"}`}><code>{JSON.stringify(testResult, null, 2)}</code></pre>
+              )}
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Add Key Modal */}
@@ -1331,6 +1531,23 @@ export default function APIPageClient({ machineId }) {
         }}
         activeProviders={activeProviders}
         allConnections={allConnections}
+      />
+
+      <ModelSelectModal
+        isOpen={showTestModelSelect}
+        onClose={() => setShowTestModelSelect(false)}
+        onSelect={(model) => {
+          setTestModel(model.value);
+          setShowTestModelSelect(false);
+          setTestResult(null);
+          setTestError("");
+        }}
+        selectedModel={testModel}
+        activeProviders={activeProviders}
+        allConnections={allConnections}
+        title="Select Model for cURL Test"
+        addedModelValues={testModel ? [testModel] : []}
+        allowedModelsFilter={selectedTestKey?.allowedModels || []}
       />
 
       {/* Confirm Modal */}

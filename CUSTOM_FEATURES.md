@@ -16,7 +16,9 @@ Setiap API Key dapat dikonfigurasi untuk membatasi model mana saja yang bisa dia
 |-------|-----------|
 | **Pattern Matching** | Support wildcard: `*` (semua), `provider/*` (semua model dari provider), `provider/model` (model spesifik) |
 | **Visual Model Picker** | Modal dengan UI visual untuk pilih model, mirip dengan "Add Model to Combo" |
-| **Quick Add Provider** | Tombol per-provider untuk quick add wildcard (e.g., "anthropic/*") |
+| **Quick Add Provider** | Tombol per-provider aktif untuk quick add wildcard (e.g., `anthropic/*`), termasuk custom provider/prefix dan mengecualikan provider yang disabled. |
+| **Clear All** | Tombol untuk mengosongkan seluruh allowed patterns sekaligus dari modal. |
+| **Allowed Count Badge** | Menampilkan jumlah model yang diizinkan di setiap API Key, misalnya `All 100 Models` atau `12 of 100 Models`. |
 | **404 Response** | Jika model tidak diizinkan, return 404 "Model not found" (bukan 403 "Not allowed") |
 | **Models Endpoint Filter** | `GET /v1/models` hanya return model yang diizinkan untuk API Key tersebut |
 | **Combo Filtering** | Combo models juga difilter berdasarkan allowed models |
@@ -175,6 +177,32 @@ Menambahkan fitur toggle (Enable/Disable) untuk _provider_ yang secara default t
 | `src/shared/services/initializeApp.js` | Filter `isActive` untuk memperhitungkan nilai `0`. |
 | `src/shared/components/UsageStats.js` | Memfilter provider `noAuth` yang sudah di-disable agar tidak muncul di bagan/flow topology pada halaman Usage. |
 | `src/sse/services/auth.js` | Mencegah injeksi virtual connection apabila provider `noAuth` secara eksplisit telah dinonaktifkan di database, sehingga benar-benar memblokir eksekusi API/chat. |
+| `src/shared/components/ModelSelectModal.js` | Memastikan semua pemanggil modal model (termasuk Combos) memfilter koneksi `isActive: 0/false` dan mengecualikan provider `noAuth` yang sudah dinonaktifkan. |
+
+---
+
+## 5. cURL Test Section di Endpoint Page
+
+**Status:** ✅ Implemented
+
+Menambahkan section **cURL Test** di halaman `/dashboard/endpoint` tepat di bawah section API Keys untuk memudahkan validasi endpoint 9Router tanpa keluar dari dashboard.
+
+### Fitur Detail
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Test `/v1/models`** | Generate command `curl` untuk endpoint model list dan bisa langsung menjalankan test dari dashboard. |
+| **Test `/v1/chat/completions`** | Generate command `curl` untuk chat completions dengan pilihan API key, model, dan prompt. |
+| **API Key Selector** | Dropdown API key aktif, otomatis memakai key aktif pertama jika tersedia. |
+| **Model Picker Integration** | Menggunakan `ModelSelectModal`, sehingga menghormati provider yang disabled dan `allowedModels` pada API key. |
+| **Copy Curl** | Tombol copy untuk command `curl` yang sudah lengkap. |
+| **Run Test** | Tombol untuk menjalankan request langsung dan menampilkan response JSON/status di dashboard. |
+
+### File yang Dimodifikasi
+
+| File | Perubahan |
+|------|-----------|
+| `src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js` | Menambahkan state, helper curl generator, UI section cURL Test, runner `/models` dan `/chat/completions`, serta modal pemilih model. |
 
 ---
 

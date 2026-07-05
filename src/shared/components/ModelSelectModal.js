@@ -38,8 +38,9 @@ export default function ModelSelectModal({
 }) {
   // Filter activeProviders by serviceKinds when kindFilter set (e.g. "webSearch", "webFetch")
   const filteredActiveProviders = useMemo(() => {
-    if (!kindFilter) return activeProviders;
-    return activeProviders.filter((p) => {
+    const activeOnly = activeProviders.filter((p) => p.isActive !== false && p.isActive !== 0);
+    if (!kindFilter) return activeOnly;
+    return activeOnly.filter((p) => {
       const info = AI_PROVIDERS[p.provider];
       const kinds = info?.serviceKinds || ["llm"];
       return kinds.includes(kindFilter);
@@ -143,8 +144,9 @@ export default function ModelSelectModal({
     const activeConnectionIds = filteredActiveProviders.map(p => p.provider);
 
       // Find disabled noAuth providers so we can exclude them
+      const connectionSource = allConnections.length > 0 ? allConnections : activeProviders;
       const disabledNoAuthIds = new Set(
-        allConnections
+        connectionSource
           .filter(c => (c.isActive === false || c.isActive === 0) && NO_AUTH_PROVIDER_IDS.includes(c.provider))
           .map(c => c.provider)
       );
@@ -600,6 +602,13 @@ ModelSelectModal.propTypes = {
   activeProviders: PropTypes.arrayOf(
     PropTypes.shape({
       provider: PropTypes.string.isRequired,
+      isActive: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
+    })
+  ),
+  allConnections: PropTypes.arrayOf(
+    PropTypes.shape({
+      provider: PropTypes.string.isRequired,
+      isActive: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
     })
   ),
   title: PropTypes.string,

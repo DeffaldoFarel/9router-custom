@@ -36,9 +36,8 @@ activeProviders = [], allConnections = [] }) {
   };
 
   // Quick-add all models from a provider as wildcard (e.g., "anthropic/*")
-  const addProviderWildcard = (providerId) => {
+  const addProviderWildcard = (alias) => {
     setPatterns((prev) => {
-      const alias = getProviderAlias(providerId) || providerId;
       const wildcard = `${alias}/*`;
       return prev.includes(wildcard) ? prev : [...prev, wildcard];
     });
@@ -46,30 +45,43 @@ activeProviders = [], allConnections = [] }) {
 
   // Providers that have models available (connected or no-auth)
   const availableProviders = useMemo(() => {
-    const providerIds = new Set(activeProviders.map((p) => p.provider));
-    
-    // Also include noAuth providers that are NOT disabled
+    const providerMap = new Map();
     const disabledNoAuthIds = new Set(
       allConnections
         .filter(c => (c.isActive === false || c.isActive === 0) && (AI_PROVIDERS[c.provider]?.noAuth || FREE_PROVIDERS[c.provider]?.noAuth))
         .map(c => c.provider)
     );
-    
+
+    activeProviders
+      .filter((p) => p?.provider && p.isActive !== false && p.isActive !== 0)
+      .forEach((p) => {
+        const providerId = p.provider;
+        const info = AI_PROVIDERS[providerId] || FREE_PROVIDERS[providerId] || {};
+        const alias = p.providerSpecificData?.prefix || getProviderAlias(providerId) || providerId;
+        providerMap.set(providerId, {
+          id: providerId,
+          alias,
+          name: p.providerSpecificData?.nodeName || info.name || p.name || alias,
+          color: info.color || "#666",
+          textIcon: info.textIcon,
+        });
+      });
+
     Object.keys(FREE_PROVIDERS).forEach(id => {
-      if (FREE_PROVIDERS[id].noAuth && !disabledNoAuthIds.has(id)) {
-        providerIds.add(id);
+      if (FREE_PROVIDERS[id].noAuth && !disabledNoAuthIds.has(id) && !providerMap.has(id)) {
+        const info = FREE_PROVIDERS[id];
+        providerMap.set(id, {
+          id,
+          alias: getProviderAlias(id) || id,
+          name: info.name || id,
+          color: info.color || "#666",
+          textIcon: info.textIcon,
+        });
       }
     });
 
-    // Also include providers from patterns that were previously saved
-    patterns.forEach((p) => {
-      if (p.endsWith("/*")) {
-        const providerPart = p.slice(0, -2);
-        providerIds.add(providerPart);
-      }
-    });
-      return [...providerIds].filter((id) => AI_PROVIDERS[id] || FREE_PROVIDERS[id]);
-  }, [activeProviders, patterns, allConnections]);
+    return [...providerMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [activeProviders, allConnections]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -92,15 +104,15 @@ activeProviders = [], allConnections = [] }) {
             <div>
               <label className="text-xs font-medium text-text-muted mb-1.5 block">Quick add provider (all models)</label>
               <div className="flex flex-wrap gap-1.5">
-                {availableProviders.map((providerId) => {
-                  const alias = getProviderAlias(providerId) || providerId;
+                {availableProviders.map((provider) => {
+                  const providerId = provider.id;
+                  const alias = provider.alias;
                   const wildcard = `${alias}/*`;
                   const isAdded = patterns.includes(wildcard);
-                  const info = AI_PROVIDERS[providerId] || FREE_PROVIDERS[providerId] || { name: providerId, color: "#666" };
                   return (
                     <button
                       key={providerId}
-                      onClick={() => isAdded ? removePattern(wildcard) : addProviderWildcard(providerId)}
+                      onClick={() => isAdded ? removePattern(wildcard) : addProviderWildcard(alias)}
                       className={`px-2 py-1 rounded-lg text-xs font-medium transition-all border flex items-center gap-1.5 ${
                         isAdded
                           ? "bg-primary border-primary text-white"
@@ -109,12 +121,12 @@ activeProviders = [], allConnections = [] }) {
                     >
                       <ProviderIcon
                         src={`/providers/${providerId}.png`}
-                        alt={info.name}
+                        alt={provider.name}
                         size={12}
-                        fallbackText={(info.name || providerId).slice(0, 2).toUpperCase()}
-                        fallbackColor={info.color}
+                        fallbackText={(provider.textIcon || provider.name || providerId).slice(0, 2).toUpperCase()}
+                        fallbackColor={provider.color}
                       />
-                      {info.name}
+                      {provider.name}
                       {isAdded && (
                         <span className="material-symbols-outlined leading-none" style={{ fontSize: "10px" }}>check</span>
                       )}
@@ -160,6 +172,11 @@ activeProviders = [], allConnections = [] }) {
                 className="flex-1 py-2 border border-dashed border-black/10 dark:border-white/10 rounded-lg text-xs text-primary font-medium hover:text-primary hover:border-primary/50 transition-colors flex items-center justify-center gap-1">
                 <span className="material-symbols-outlined text-[16px]">star</span>
                 All Models (*)
+              </button>
+              <button onClick={() => setPatterns([])} disabled={patterns.length === 0}
+                className="flex-1 py-2 border border-dashed border-black/10 dark:border-white/10 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1 disabled:cursor-not-allowed disabled:opacity-40 text-red-500 hover:border-red-500/50 hover:bg-red-500/5">
+                <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
+                Clear All
               </button>
             </div>
           </div>
