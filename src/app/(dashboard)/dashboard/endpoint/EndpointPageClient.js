@@ -20,7 +20,7 @@ import SecurityWarning from "./components/SecurityWarning";
 import { isModelAllowed } from "@/lib/modelMatcher";
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
-  const [availableModels, setAvailableModels] = useState([]);
+  const [exactAvailableModels, setExactAvailableModels] = useState({ total: 0, modelIds: [] });
   const [activeProviders, setActiveProviders] = useState([]);
   const [allConnections, setAllConnections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -695,11 +695,11 @@ export default function APIPageClient({ machineId }) {
   };
 
   const getAllowedModelsLabel = (key) => {
-    const total = availableModels.length;
+    const total = exactAvailableModels.total;
     const labelTotal = `${total} Model${total === 1 ? "" : "s"}`;
     const allowed = Array.isArray(key.allowedModels) ? key.allowedModels : [];
     if (allowed.length === 0 || allowed.includes("*")) return `All ${labelTotal}`;
-    const count = availableModels.filter((model) => isModelAllowed(allowed, model.id)).length;
+    const count = exactAvailableModels.modelIds.filter((modelId) => isModelAllowed(allowed, modelId)).length;
     return `${count} of ${labelTotal}`;
   };
 
@@ -721,29 +721,33 @@ export default function APIPageClient({ machineId }) {
     }
   }, []);
 
-  const fetchAvailableModels = useCallback(async () => {
+  const fetchExactAvailableModels = useCallback(async () => {
     try {
       const res = await fetch("/api/models/available", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         if (data.models && Array.isArray(data.models)) {
-          setAvailableModels(data.models.filter(m => m?.id));
+          setExactAvailableModels({
+            total: data.models.length,
+            modelIds: data.models.map(m => m.id)
+          });
           return;
         }
       }
     } catch (e) {
       console.error("Failed to fetch available models", e);
     }
-    setAvailableModels([]);
+    setExactAvailableModels({ total: 0, modelIds: [] });
   }, []);
 
   const activeKeys = useMemo(
     () => keys.filter((key) => key.isActive !== false && key.isActive !== 0),
     [keys]
   );
+
   useEffect(() => {
-    fetchAvailableModels();
-  }, [fetchAvailableModels]);
+    fetchExactAvailableModels();
+  }, [fetchExactAvailableModels]);
   const selectedTestKey = useMemo(
     () => activeKeys.find((key) => key.id === testKeyId) || activeKeys[0] || null,
     [activeKeys, testKeyId]

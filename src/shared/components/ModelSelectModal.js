@@ -35,6 +35,7 @@ export default function ModelSelectModal({
   addedModelValues = [],
   closeOnSelect = true,
   allowedModelsFilter = [],
+  onModelsCalculated = null, // Callback to report the final calculated models back to parent
 }) {
   // Filter activeProviders by serviceKinds when kindFilter set (e.g. "webSearch", "webFetch")
   const filteredActiveProviders = useMemo(() => {
@@ -381,6 +382,39 @@ export default function ModelSelectModal({
     return filtered;
   }, [combos, searchQuery, kindFilter, allowedModelsFilter]);
 
+  // Report the total calculated models to the parent component (for accurate counting/badges)
+  useEffect(() => {
+    if (!onModelsCalculated) return;
+    
+    // We only want the total base models ignoring the search query and the allowed models filter
+    // so the badge can calculate how many are allowed OUT OF the actual total.
+    let totalBaseModels = 0;
+    
+    // Count all models across all provider groups
+    Object.values(groupedModels).forEach(group => {
+      totalBaseModels += group.models.length;
+    });
+    
+    // Add combos if not filtered out by kind
+    if (!kindFilter) {
+      totalBaseModels += combos.length;
+    }
+    
+    // Also build a flat array of all base model IDs so the parent can check against allowedModels
+    const allBaseModelIds = [];
+    Object.values(groupedModels).forEach(group => {
+      group.models.forEach(m => allBaseModelIds.push(m.value));
+    });
+    if (!kindFilter) {
+      combos.forEach(c => allBaseModelIds.push(c.name));
+    }
+    
+    onModelsCalculated({
+      total: totalBaseModels,
+      modelIds: allBaseModelIds
+    });
+  }, [groupedModels, combos, kindFilter, onModelsCalculated]);
+
   // Sort models alphabetically, with added models floated to top
   const sortModels = (models) => {
     const added = models.filter(m => addedModelValues.includes(m.value)).sort((a, b) => a.name.localeCompare(b.name));
@@ -617,4 +651,5 @@ ModelSelectModal.propTypes = {
   addedModelValues: PropTypes.arrayOf(PropTypes.string),
   closeOnSelect: PropTypes.bool,
   allowedModelsFilter: PropTypes.arrayOf(PropTypes.string),
+  onModelsCalculated: PropTypes.func,
 };

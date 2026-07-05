@@ -60,47 +60,69 @@ export async function GET() {
       const outputAlias = (conn?.providerSpecificData?.prefix || staticAlias).trim();
       
       const providerModels = PROVIDER_MODELS[staticAlias] || [];
-      const enabledModels = conn?.providerSpecificData?.enabledModels;
-      const hasExplicitEnabledModels = Array.isArray(enabledModels) && enabledModels.length > 0;
-      const isCompatibleProvider = isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
+      const isCustomProvider = isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
 
-      let rawModelIds = hasExplicitEnabledModels 
-        ? enabledModels.filter((modelId) => typeof modelId === "string" && modelId.trim() !== "")
-        : providerModels.map(m => m.id);
+      // We only extract LLM models
+      const hardcodedModels = providerModels.filter(m => !m.type || m.type === "llm" || m.type === "imageToText");
+      const hardcodedIds = new Set(hardcodedModels.map(m => m.id));
+      const hasHardcoded = hardcodedModels.length > 0;
 
-      // Include placeholder if custom provider has no models selected (better safe)
-      if (isCompatibleProvider && rawModelIds.length === 0) {
-        rawModelIds = ["*"];
+      let mergedModelsForThisProvider = [];
+
+      if (isCustomProvider) {
+        // Custom (openai/anthropic-compatible) providers
+        const nodePrefix = outputAlias;
+        const nodeModels = Object.entries(modelAliases)
+          .filter(([, fullModel]) => fullModel.startsWith(`${providerId}/`))
+          .map(([aliasName, fullModel]) => ({
+            id: `${nodePrefix}/${fullModel.replace(`${providerId}/`, "")}`,
+            rawId: fullModel.replace(`${providerId}/`, "")
+          }));
+
+        const registeredCustom = customModels
+          .filter((m) => m.providerAlias === providerId)
+          .map((m) => ({
+            id: `${nodePrefix}/${m.id}`,
+            rawId: m.id
+          }));
+
+        const seen = new Set(nodeModels.map(m => m.id));
+        mergedModelsForThisProvider = [...nodeModels, ...registeredCustom.filter(m => !seen.has(m.id))];
+
+        if (mergedModelsForThisProvider.length === 0) {
+          mergedModelsForThisProvider.push({ id: `${nodePrefix}/model-id`, rawId: "model-id" });
+        }
+      } else {
+        // Normal providers
+        const customAliasModels = Object.entries(modelAliases)
+          .filter(([aliasName, fullModel]) =>
+            fullModel.startsWith(`${staticAlias}/`) &&
+            (hasHardcoded ? aliasName === fullModel.replace(`${staticAlias}/`, "") : true) &&
+            !hardcodedIds.has(fullModel.replace(`${staticAlias}/`, ""))
+          )
+          .map(([aliasName, fullModel]) => ({
+            id: fullModel,
+            rawId: fullModel.replace(`${staticAlias}/`, "")
+          }));
+
+        const customAliasIds = new Set(customAliasModels.map((m) => m.rawId));
+        const customRegisteredModels = customModels
+          .filter((m) => m.providerAlias === staticAlias && !hardcodedIds.has(m.id) && !customAliasIds.has(m.id) && (!m.type || m.type === "llm" || m.type === "imageToText"))
+          .map((m) => ({ id: `${staticAlias}/${m.id}`, rawId: m.id }));
+
+        const baseHardcodedModels = hardcodedModels.map(m => ({ id: `${staticAlias}/${m.id}`, rawId: m.id }));
+
+        mergedModelsForThisProvider = [
+          ...baseHardcodedModels,
+          ...customAliasModels,
+          ...customRegisteredModels,
+        ];
       }
 
-      // Add static and explicitly enabled models
-      rawModelIds.forEach(modelId => {
-        let cleanId = modelId;
-        if (cleanId.startsWith(`${outputAlias}/`)) cleanId = cleanId.slice(outputAlias.length + 1);
-        if (cleanId.startsWith(`${staticAlias}/`)) cleanId = cleanId.slice(staticAlias.length + 1);
-        if (cleanId.startsWith(`${providerId}/`)) cleanId = cleanId.slice(providerId.length + 1);
-        
-        if (cleanId && !isDisabled(outputAlias, cleanId) && !isDisabled(staticAlias, cleanId)) {
-          models.push({ id: `${outputAlias}/${cleanId}`, object: "model", owned_by: outputAlias });
-        }
-      });
-
-      // Add Custom Models for this provider
-      customModels.filter(m => m.providerAlias === providerId || m.providerAlias === outputAlias || m.providerAlias === staticAlias).forEach(m => {
-        const cleanId = String(m.id).trim();
-        if (cleanId && !isDisabled(outputAlias, cleanId) && !isDisabled(staticAlias, cleanId)) {
-          models.push({ id: `${outputAlias}/${cleanId}`, object: "model", owned_by: outputAlias });
-        }
-      });
-
-      // Add Model Aliases pointing to this provider
-      Object.entries(modelAliases).forEach(([aliasName, fullModel]) => {
-        if (typeof fullModel !== "string") return;
-        if (fullModel.startsWith(`${outputAlias}/`) || fullModel.startsWith(`${staticAlias}/`) || fullModel.startsWith(`${providerId}/`)) {
-          const cleanId = aliasName; // alias name is what user sees
-          if (cleanId && !isDisabled(outputAlias, cleanId) && !isDisabled(staticAlias, cleanId)) {
-            models.push({ id: `${outputAlias}/${cleanId}`, object: "model", owned_by: outputAlias });
-          }
+      // Apply Disabled Models filter for this specific provider
+      mergedModelsForThisProvider.forEach(m => {
+        if (!isDisabled(outputAlias, m.rawId) && !isDisabled(staticAlias, m.rawId) && !isDisabled(providerId, m.rawId)) {
+          models.push({ id: m.id, object: "model", owned_by: outputAlias });
         }
       });
     }
