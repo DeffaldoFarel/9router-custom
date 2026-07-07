@@ -4,6 +4,7 @@ import "open-sse/index.js";
 import { getSettings, getProviderConnections, updateProviderConnection } from "@/lib/localDb";
 import { getClaudeUsage } from "open-sse/services/usage/claude.js";
 import { getCodexUsage } from "open-sse/services/usage/codex.js";
+import { getAntigravityUsage } from "open-sse/services/usage/google.js";
 import { getExecutor } from "open-sse/executors/index.js";
 import { CLAUDE_CLI_SPOOF_HEADERS } from "open-sse/providers/shared.js";
 import { proxyAwareFetch } from "open-sse/utils/proxyFetch.js";
@@ -22,6 +23,10 @@ const providerHandlers = {
   codex: {
     getUsage: getCodexUsage,
     sendPing: sendCodexPing,
+  },
+  antigravity: {
+    getUsage: getAntigravityUsage,
+    sendPing: sendAntigravityPing,
   },
 };
 
@@ -103,7 +108,7 @@ function buildProxyOptions(cfg) {
   };
 }
 
-async function sendClaudePing(connection, providerConfig, proxyOptions, deps) {
+async function sendClaudePing(connection, providerConfig, proxyOptions, deps, selectedModel) {
   const res = await deps.proxyAwareFetch(CLAUDE_PING_URL, {
     method: "POST",
     headers: {
@@ -147,7 +152,7 @@ async function drainResponseBody(response) {
   }
 }
 
-async function sendCodexPing(connection, providerConfig, proxyOptions, deps) {
+async function sendCodexPing(connection, providerConfig, proxyOptions, deps, selectedModel) {
   const executor = deps.getExecutor("codex");
   const { response } = await executor.execute({
     model: providerConfig.pingModel,
@@ -176,6 +181,37 @@ async function sendCodexPing(connection, providerConfig, proxyOptions, deps) {
   }
 
   // Codex only starts the 5h window after the streaming response completes.
+  await drainResponseBody(response);
+  return true;
+}
+
+async function sendAntigravityPing(connection, providerConfig, proxyOptions, deps, selectedModel) {
+  const executor = deps.getExecutor("antigravity");
+  const modelToPing = selectedModel || providerConfig.pingModel;
+  const { response } = await executor.execute({
+    model: modelToPing,
+    stream: true,
+    credentials: {
+      accessToken: connection.accessToken,
+      connectionId: connection.id,
+      providerSpecificData: connection.providerSpecificData,
+    },
+    proxyOptions,
+    log: console,
+    body: {
+      model: modelToPing,
+      stream: true,
+      request: {
+        contents: [{ role: "user", parts: [{ text: providerConfig.pingText }] }],
+        generationConfig: { maxOutputTokens: providerConfig.pingMaxTokens }
+      }
+    },
+  });
+  if (!response.ok) {
+    try { await response.body?.cancel?.(); } catch { /* noop */ }
+    return false;
+  }
+
   await drainResponseBody(response);
   return true;
 }
@@ -228,7 +264,18 @@ async function pingConnection(conn, provider, providerConfig, handler, deps, sta
   if (wasPingedRecently(connection, providerConfig.minPingIntervalMs, now)) return;
   if (lastPingedResetKey === resetKey) return;
 
-  const ok = await handler.sendPing(connection, providerConfig, proxyOptions, deps);
+  // Determine model for ping (alternating if providerConfig.pingModels exists)
+  let selectedPingModel = providerConfig.pingModel;
+  if (Array.isArray(providerConfig.pingModels) && providerConfig.pingModels.length > 0) {
+    const lastPingedModelKey = `${key}:lastModel`;
+    const lastModel = state[lastPingedModelKey];
+    const currentIndex = providerConfig.pingModels.indexOf(lastModel);
+    const nextIndex = (currentIndex + 1) % providerConfig.pingModels.length;
+    selectedPingModel = providerConfig.pingModels[nextIndex];
+    state[lastPingedModelKey] = selectedPingModel;
+  }
+
+  const ok = await handler.sendPing(connection, providerConfig, proxyOptions, deps, selectedPingModel);
   if (!ok) {
     // Do not mark reset as pinged unless upstream accepted the tiny request.
     state.failureCache[key] = Date.now();
@@ -243,7 +290,7 @@ async function pingConnection(conn, provider, providerConfig, handler, deps, sta
     lastPingAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
-  console.log(`[AutoPing] ${provider}:${connection.id}: ping sent (reset ${resetAt})`);
+  console.log(`[AutoPing] ${provider}:${connection.id}: ping sent (reset ${resetAt}${selectedPingModel ? `, model ${selectedPingModel}` : ""})`);
 }
 
 function createDefaultDeps() {

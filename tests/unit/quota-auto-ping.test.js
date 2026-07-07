@@ -42,12 +42,26 @@ vi.mock("@/shared/constants/config", () => ({
         pingInstructions: "Reply with OK.",
         pingReasoningEffort: "none",
       },
+      antigravity: {
+        settingsKey: "antigravityAutoPing",
+        quotaKey: "gemini-3-flash-agent",
+        pingWhenResetAtSlides: true,
+        resetAtDriftMs: 30000,
+        minPingIntervalMs: 600000,
+        skipWhenBlockingQuotaExhausted: true,
+        pingModels: ["gemini-3-flash", "claude-sonnet-4-6"],
+        pingModel: "gemini-3-flash",
+        pingText: "hi",
+        pingMaxTokens: 1,
+      },
     },
   },
 }));
 
 vi.mock("open-sse/providers/shared.js", () => ({
   CLAUDE_CLI_SPOOF_HEADERS: { "anthropic-version": "2023-06-01" },
+  CLAUDE_API_HEADERS: { "anthropic-version": "2023-06-01" },
+  ANTIGRAVITY_OAUTH_CLIENT: { clientId: "id", clientSecret: "secret" },
 }));
 
 vi.mock("open-sse/services/usage/shared.js", () => ({
@@ -66,6 +80,10 @@ vi.mock("open-sse/services/usage/codex.js", () => ({
   getCodexUsage: vi.fn(),
 }));
 
+vi.mock("open-sse/services/usage/google.js", () => ({
+  getAntigravityUsage: vi.fn(),
+}));
+
 vi.mock("open-sse/executors/index.js", () => ({
   getExecutor: vi.fn(),
 }));
@@ -76,6 +94,7 @@ describe("quota auto-ping", () => {
   let state;
   let getCodexUsage;
   let getClaudeUsage;
+  let getAntigravityUsage;
   let getExecutor;
   let codexResponseText;
 
@@ -86,6 +105,7 @@ describe("quota auto-ping", () => {
 
     ({ getCodexUsage } = await import("open-sse/services/usage/codex.js"));
     ({ getClaudeUsage } = await import("open-sse/services/usage/claude.js"));
+    ({ getAntigravityUsage } = await import("open-sse/services/usage/google.js"));
     ({ getExecutor } = await import("open-sse/executors/index.js"));
     ({ runQuotaAutoPingTick } = await import("../../src/shared/services/quotaAutoPing.js"));
 
@@ -347,5 +367,50 @@ describe("quota auto-ping", () => {
       max_tokens: 1,
       messages: [{ role: "user", content: "hi" }],
     });
+  });
+
+  it("does not ping Antigravity when setting is absent", async () => {
+    deps.getSettings.mockResolvedValue({});
+
+    await runQuotaAutoPingTick(deps, state);
+
+    expect(deps.getProviderConnections).not.toHaveBeenCalled();
+    expect(deps.getExecutor).not.toHaveBeenCalled();
+  });
+
+  it("sends Antigravity ping and alternates models when resetAt slides", async () => {
+    deps.getSettings.mockResolvedValue({ antigravityAutoPing: { connections: { "ag-1": true } } });
+    deps.getProviderConnections.mockImplementation(async ({ provider }) => (
+      provider === "antigravity" ? [{ id: "ag-1", provider: "antigravity", authType: "oauth", accessToken: "token" }] : []
+    ));
+    state.resetCache["antigravity:ag-1"] = "2026-01-01T17:00:00.000Z";
+    getAntigravityUsage.mockResolvedValue({
+      quotas: { "gemini-3-flash-agent": { used: 1, total: 100, remaining: 99, resetAt: "2026-01-01T17:01:00.000Z" } },
+    });
+
+    // First ping: should alternate to the first model in the array (e.g. gemini-3-flash)
+    await runQuotaAutoPingTick(deps, state);
+
+    const executor = deps.getExecutor.mock.results[0].value;
+    expect(executor.execute).toHaveBeenCalledTimes(1);
+    expect(executor.execute.mock.calls[0][0].model).toBe("gemini-3-flash");
+    expect(deps.updateProviderConnection).toHaveBeenCalledWith("ag-1", expect.objectContaining({
+      lastPingedResetAt: "2026-01-01T17:01:00.000Z",
+      lastPingedResetKey: "2026-01-01T17:01:00.000Z",
+    }));
+
+    // For second tick: slide reset time again
+    deps.updateProviderConnection.mockClear();
+    state.resetCache["antigravity:ag-1"] = "2026-01-01T17:01:00.000Z";
+    getAntigravityUsage.mockResolvedValue({
+      quotas: { "gemini-3-flash-agent": { used: 1, total: 100, remaining: 99, resetAt: "2026-01-01T17:02:00.000Z" } },
+    });
+
+    // Second ping: should alternate to the second model (claude-sonnet-4-6)
+    await runQuotaAutoPingTick(deps, state);
+
+    const executor2 = deps.getExecutor.mock.results[1].value;
+    expect(executor2.execute).toHaveBeenCalledTimes(1);
+    expect(executor2.execute.mock.calls[0][0].model).toBe("claude-sonnet-4-6");
   });
 });

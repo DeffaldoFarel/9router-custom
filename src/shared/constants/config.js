@@ -89,6 +89,18 @@ export const QUOTA_AUTOPING_CONFIG = {
       pingInstructions: "Reply with OK.",
       pingReasoningEffort: "none",
     },
+    antigravity: {
+      settingsKey: "antigravityAutoPing",
+      quotaKey: "gemini-3-flash-agent",
+      pingWhenResetAtSlides: true,
+      resetAtDriftMs: 30000,
+      minPingIntervalMs: 600000,
+      skipWhenBlockingQuotaExhausted: true,
+      pingModels: ["gemini-3-flash", "claude-sonnet-4-6"],
+      pingModel: "gemini-3-flash",      // Fallback
+      pingText: "hi",
+      pingMaxTokens: 1,
+    },
   },
 };
 

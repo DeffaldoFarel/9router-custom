@@ -55,11 +55,13 @@ const KIRO_METHOD_LABELS = {
 const AUTO_PING_SETTINGS_KEYS = {
   claude: "claudeAutoPing",
   codex: "codexAutoPing",
+  antigravity: "antigravityAutoPing",
 };
 
 const AUTO_PING_TOOLTIPS = {
   claude: "When your 5h quota runs out, auto-sends a request the moment it resets so a new window starts right away.",
   codex: "Auto-starts the next 5h Codex window after reset by sending a tiny gpt-5.5 request. Consumes a small amount of quota.",
+  antigravity: "Auto-starts the next rolling Antigravity window after reset by alternately pinging Gemini and Claude models. Consumes a small amount of quota.",
 };
 
 function kiroMethodLabel(conn) {
@@ -128,7 +130,7 @@ export default function ProviderLimits() {
   const [loading, setLoading] = useState({});
   const [errors, setErrors] = useState({});
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [autoPingMaps, setAutoPingMaps] = useState({ claude: {}, codex: {} });
+  const [autoPingMaps, setAutoPingMaps] = useState({ claude: {}, codex: {}, antigravity: {} });
   const [lastUpdated, setLastUpdated] = useState(null);
   const [hasHydratedAutoRefresh, setHasHydratedAutoRefresh] = useState(false);
   const [refreshingAll, setRefreshingAll] = useState(false);
@@ -539,6 +541,7 @@ export default function ProviderLimits() {
       .then((s) => setAutoPingMaps({
         claude: s?.claudeAutoPing?.connections || {},
         codex: s?.codexAutoPing?.connections || {},
+        antigravity: s?.antigravityAutoPing?.connections || {},
       }))
       .catch(() => {});
   }, []);

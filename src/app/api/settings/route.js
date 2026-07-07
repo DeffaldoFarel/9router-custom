@@ -99,7 +99,8 @@ export async function PATCH(request) {
 
     if (
       Object.prototype.hasOwnProperty.call(body, "claudeAutoPing") ||
-      Object.prototype.hasOwnProperty.call(body, "codexAutoPing")
+      Object.prototype.hasOwnProperty.call(body, "codexAutoPing") ||
+      Object.prototype.hasOwnProperty.call(body, "antigravityAutoPing")
     ) {
       // Run once immediately after opt-in changes so users don't wait for the next scheduler tick.
       runQuotaAutoPingTick().catch((error) => {
