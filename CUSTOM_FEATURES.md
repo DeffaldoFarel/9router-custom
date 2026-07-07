@@ -207,6 +207,35 @@ Menambahkan section **cURL Test** di halaman `/dashboard/endpoint` tepat di bawa
 
 ---
 
+## 6. Quota Auto-Ping untuk Antigravity (Alternating Models)
+
+**Status:** ✅ Implemented
+
+Mengimplementasikan fitur Quota Auto-Ping pada provider Antigravity (mirip dengan fitur Codex Auto-Ping) untuk menghangatkan jendela kuota rolling secara otomatis. Khusus Antigravity, ping dikirimkan secara bergantian (*alternating*) antara model Gemini dan model Claude karena keduanya memiliki pool kuota terpisah.
+
+### Fitur Detail
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Sliding Window Detection** | Mendeteksi pergeseran waktu reset (`resetAt` drift >= 30 detik) yang menandakan jendela kuota rolling sebelumnya telah kedaluwarsa. |
+| **Alternating Models Ping** | Mengirimkan ping request secara bergantian antara model `gemini-3-flash` dan `claude-sonnet-4-6` untuk menghangatkan kedua pool kuota sekaligus. |
+| **Scheduler State Tracking** | Menggunakan memori scheduler state (`state`) untuk melacak model terakhir yang di-ping agar giliran ping berikutnya presisi. |
+| **Minimal Payload Size** | Request ping dikirimkan dengan konfigurasi minimal (`maxOutputTokens: 1` dengan prompt `"hi"`) untuk meminimalkan konsumsi kuota. |
+| **Dashboard Controls & Tooltip** | Menambahkan switch toggle "Auto-ping" pada halaman detail provider Antigravity serta halaman Limits dashboard lengkap dengan tooltip deskriptif. |
+
+### File yang Dimodifikasi
+
+| File | Perubahan |
+|------|-----------|
+| `src/shared/constants/config.js` | Menambahkan konfigurasi `antigravity` di `QUOTA_AUTOPING_CONFIG.providers`. |
+| `src/shared/services/quotaAutoPing.js` | Mengimpor `getAntigravityUsage`, mendefinisikan `sendAntigravityPing`, dan mengimplementasikan logika pergantian model ping berbasis state. |
+| `src/app/api/settings/route.js` | Menambahkan pengecekan `"antigravityAutoPing"` di validasi PATCH settings. |
+| `src/app/(dashboard)/dashboard/providers/[id]/page.js` | Menambahkan `antigravity` ke `AUTO_PING_SETTINGS_KEYS` untuk UI detail page. |
+| `src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js` | Menambahkan key, tooltip, dan reactive state untuk toggle auto-ping Antigravity di tabel Limits. |
+| `tests/unit/quota-auto-ping.test.js` | Menambahkan unit tests khusus Antigravity auto-ping (memverifikasi absence, sliding reset, dan alternating model execution) serta memperbaiki mock dependency. |
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
