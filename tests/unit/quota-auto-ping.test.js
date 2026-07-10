@@ -62,6 +62,8 @@ vi.mock("open-sse/providers/shared.js", () => ({
   CLAUDE_CLI_SPOOF_HEADERS: { "anthropic-version": "2023-06-01" },
   CLAUDE_API_HEADERS: { "anthropic-version": "2023-06-01" },
   ANTIGRAVITY_OAUTH_CLIENT: { clientId: "id", clientSecret: "secret" },
+  ANTIGRAVITY_IDE_BASE_URL: "https://cloudcode-pa.googleapis.com",
+  ANTIGRAVITY_IDE_USER_AGENT: "antigravity/ide/2.1.1 darwin/arm64",
 }));
 
 vi.mock("open-sse/services/usage/shared.js", () => ({
