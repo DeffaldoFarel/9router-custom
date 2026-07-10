@@ -119,6 +119,24 @@ export default function ModelSelectModal({
     if (shouldFetchModalData) fetchDisabledModels();
   }, [shouldFetchModalData]);
 
+  const [fetchedConnections, setFetchedConnections] = useState([]);
+
+  const fetchConnections = async () => {
+    try {
+      const res = await fetch("/api/providers");
+      if (!res.ok) throw new Error(`Failed to fetch providers: ${res.status}`);
+      const data = await res.json();
+      setFetchedConnections(data.connections || []);
+    } catch (error) {
+      console.error("Error fetching connections in ModelSelectModal:", error);
+      setFetchedConnections([]);
+    }
+  };
+
+  useEffect(() => {
+    if (shouldFetchModalData) fetchConnections();
+  }, [shouldFetchModalData]);
+
   const allProviders = useMemo(() => ({ ...OAUTH_PROVIDERS, ...FREE_PROVIDERS, ...FREE_TIER_PROVIDERS, ...APIKEY_PROVIDERS }), []);
 
   // Group models by provider with priority order
@@ -146,7 +164,7 @@ export default function ModelSelectModal({
     const activeConnectionIds = filteredActiveProviders.map(p => p.provider);
 
       // Find disabled noAuth providers so we can exclude them
-      const connectionSource = allConnections.length > 0 ? allConnections : activeProviders;
+      const connectionSource = allConnections.length > 0 ? allConnections : (fetchedConnections.length > 0 ? fetchedConnections : activeProviders);
       const disabledNoAuthIds = new Set(
         connectionSource
           .filter(c => (c.isActive === false || c.isActive === 0) && NO_AUTH_PROVIDER_IDS.includes(c.provider))
@@ -363,7 +381,7 @@ export default function ModelSelectModal({
     });
 
     return groups;
-  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, allConnections]);
+  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, allConnections, fetchedConnections]);
 
   // Filter combos by search query (and hide combos when kindFilter is set — combos are LLM-only by design)
   // AND filter by allowedModelsFilter if provided
