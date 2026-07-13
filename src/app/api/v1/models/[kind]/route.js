@@ -1,6 +1,6 @@
 import { buildModelsList } from "../route.js";
 import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
-import { isModelAllowed } from "@/lib/modelMatcher";
+import { isModelAllowedBackend } from "@/sse/services/model";
 
 // URL slug → service kind(s). `web` covers both webSearch and webFetch.
 const KIND_SLUG_MAP = {
@@ -50,7 +50,13 @@ export async function GET(request, { params }) {
     if (apiKey) {
       const keyRecord = await isValidApiKey(apiKey, true);
       if (keyRecord?.allowedModels?.length > 0) {
-        data = data.filter(m => isModelAllowed(keyRecord.allowedModels, m.id));
+        const filtered = [];
+        for (const m of data) {
+          if (await isModelAllowedBackend(keyRecord.allowedModels, m.id)) {
+            filtered.push(m);
+          }
+        }
+        data = filtered;
       }
     }
 

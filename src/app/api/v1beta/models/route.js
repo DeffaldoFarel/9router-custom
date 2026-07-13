@@ -1,6 +1,6 @@
 import { PROVIDER_MODELS } from "@/shared/constants/models";
 import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
-import { isModelAllowed } from "@/lib/modelMatcher";
+import { isModelAllowedBackend } from "@/sse/services/model";
 
 /**
  * Handle CORS preflight
@@ -34,14 +34,14 @@ export async function GET(request) {
       }
     }
 
-    function addModel({ name, displayName, description, methods = ["generateContent"] }) {
+    async function addModel({ name, displayName, description, methods = ["generateContent"] }) {
       if (seen.has(name)) return;
       
       // Filter out if restricted
       if (allowedModelsFilter.length > 0) {
         // Strip 'models/' prefix to test against matchPattern rules like 'anthropic/claude-3-opus'
         const baseId = name.replace(/^models\//, "");
-        if (!isModelAllowed(allowedModelsFilter, baseId)) return;
+        if (!(await isModelAllowedBackend(allowedModelsFilter, baseId))) return;
       }
       
       seen.add(name);
@@ -57,14 +57,14 @@ export async function GET(request) {
     
     for (const [provider, providerModels] of Object.entries(PROVIDER_MODELS)) {
       for (const model of providerModels) {
-        addModel({
+        await addModel({
           name: `models/${provider}/${model.id}`,
           displayName: model.name || model.id,
           description: `${provider} model: ${model.name || model.id}`,
         });
 
         if (provider === "gemini") {
-          addModel({
+          await addModel({
             name: `models/${model.id}`,
             displayName: model.name || model.id,
             description: `Gemini model: ${model.name || model.id}`,

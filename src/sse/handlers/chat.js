@@ -9,7 +9,7 @@ import {
 } from "../services/auth.js";
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
 import { getSettings } from "@/lib/localDb";
-import { getModelInfo, getComboModels } from "../services/model.js";
+import { getModelInfo, getComboModels, isModelAllowedBackend } from "../services/model.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
 import { DEFAULT_HEADROOM_URL } from "@/lib/headroom/detect";
 import { getTransform as getPxpipeTransform } from "@/lib/pxpipe/loader.js";
@@ -93,7 +93,13 @@ export async function handleChat(request, clientRawRequest = null) {
     // Filter combo models by API key allowed models
     let filteredCombo = comboModels;
     if (keyRecord?.allowedModels?.length > 0) {
-      filteredCombo = filterComboModels(keyRecord.allowedModels, comboModels);
+      const filtered = [];
+      for (const m of comboModels) {
+        if (await isModelAllowedBackend(keyRecord.allowedModels, m.provider, m.model)) {
+          filtered.push(m);
+        }
+      }
+      filteredCombo = filtered;
       if (filteredCombo.length === 0) {
         log.info("AUTH", `API key has no access to any models in combo "${modelStr}"`);
         return errorResponse(HTTP_STATUS.NOT_FOUND, `Model not found: ${modelStr}`);
@@ -156,7 +162,13 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       // Filter combo models by API key allowed models
       let filteredCombo = comboModels;
       if (keyRecord?.allowedModels?.length > 0) {
-        filteredCombo = filterComboModels(keyRecord.allowedModels, comboModels);
+        const filtered = [];
+        for (const m of comboModels) {
+          if (await isModelAllowedBackend(keyRecord.allowedModels, m.provider, m.model)) {
+            filtered.push(m);
+          }
+        }
+        filteredCombo = filtered;
         if (filteredCombo.length === 0) {
           log.info("AUTH", `API key has no access to any models in combo "${modelStr}"`);
           return errorResponse(HTTP_STATUS.NOT_FOUND, `Model not found: ${modelStr}`);
@@ -206,12 +218,14 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
   }
 
   const { provider, model } = modelInfo;
-  const resolvedModel = `${provider}/${model}`;
 
   // Check if model is allowed by API key restrictions
-  if (keyRecord?.allowedModels?.length > 0 && !isModelAllowed(keyRecord.allowedModels, resolvedModel)) {
-    log.info("AUTH", `API key denied access to "${resolvedModel}" (returning 404)`);
-    return errorResponse(HTTP_STATUS.NOT_FOUND, `Model not found: ${resolvedModel}`);
+  if (keyRecord?.allowedModels?.length > 0) {
+    const isAllowed = await isModelAllowedBackend(keyRecord.allowedModels, provider, model);
+    if (!isAllowed) {
+      log.info("AUTH", `API key denied access to "${provider}/${model}" (returning 404)`);
+      return errorResponse(HTTP_STATUS.NOT_FOUND, `Model not found: ${modelStr}`);
+    }
   }
 
   // Routing shown in the unified "▶" line (client model → provider/model)

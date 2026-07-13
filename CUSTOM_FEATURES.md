@@ -54,9 +54,11 @@ Authorization: Bearer sk-xxxxx
 | `src/lib/db/schema.js` | Kolom `allowedModels` di tabel `apiKeys` |
 | `src/lib/db/repos/apiKeysRepo.js` | CRUD `allowedModels`, lazy migration fallback |
 | `src/lib/modelMatcher.js` | Pattern matching utility |
+| `src/sse/services/model.js` | Backend model restriction matching helper `isModelAllowedBackend` |
 | `src/sse/handlers/chat.js` | Model access check (return 404) |
 | `src/app/api/v1/models/route.js` | Filter models by API key |
 | `src/app/api/v1/models/[kind]/route.js` | Filter models by API key |
+| `src/app/api/v1beta/models/route.js` | Filter Gemini models by API key |
 | `src/app/api/keys/route.js` | Accept `allowedModels` di POST |
 | `src/app/api/keys/[id]/route.js` | Accept `allowedModels` di PUT |
 | `src/shared/components/ApiKeyModelAccessModal.js` | UI modal visual picker |

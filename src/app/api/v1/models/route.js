@@ -16,7 +16,7 @@ import { resolveClinepassModels } from "open-sse/services/clinepassModels.js";
 import { updateProviderCredentials } from "@/sse/services/tokenRefresh";
 import { capabilitiesFromServiceKind } from "open-sse/providers/capabilities.js";
 import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
-import { isModelAllowed } from "@/lib/modelMatcher";
+import { isModelAllowedBackend } from "@/sse/services/model";
 
 // Per-provider live model resolvers. Each receives a connection record and
 // returns { models: [{ id, name? }, ...] } | null on failure.
@@ -514,7 +514,13 @@ export async function GET(request) {
     if (apiKey) {
       const keyRecord = await isValidApiKey(apiKey, true); // true to get full record
       if (keyRecord?.allowedModels?.length > 0) {
-        data = data.filter(m => isModelAllowed(keyRecord.allowedModels, m.id));
+        const filtered = [];
+        for (const m of data) {
+          if (await isModelAllowedBackend(keyRecord.allowedModels, m.id)) {
+            filtered.push(m);
+          }
+        }
+        data = filtered;
       }
     }
 

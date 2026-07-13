@@ -7,6 +7,8 @@ export {
   getSettings, updateSettings, isCloudEnabled, getCloudUrl, exportSettings,
 } from "./repos/settingsRepo.js";
 
+export { closeAdapter } from "./driver.js";
+
 // Provider connections
 export {
   getProviderConnections, getProviderConnectionById,

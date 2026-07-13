@@ -2,6 +2,8 @@
 import { getModelAliases, getComboByName, getProviderNodes } from "@/lib/localDb";
 import { parseModel as parseModelCore, resolveModelAliasFromMap, getModelInfoCore } from "open-sse/services/model.js";
 import REGISTRY from "open-sse/providers/registry/index.js";
+import { isModelAllowed } from "@/lib/modelMatcher";
+import { getProviderAlias } from "@/shared/constants/providers";
 
 // Local provider alias overrides (HMR-friendly, applied on top of open-sse map)
 const LOCAL_PROVIDER_ALIASES = {
@@ -91,4 +93,57 @@ export async function getComboModels(modelStr) {
     return combo.models;
   }
   return null;
+}
+
+/**
+ * Check if a model is allowed, considering custom provider prefixes and built-in aliases.
+ * @param {string[]} allowedModels - Allowed model patterns
+ * @param {string} providerOrFullId - Provider ID or full model ID
+ * @param {string|null} model - Model ID (optional if providerOrFullId is full ID)
+ * @returns {Promise<boolean>}
+ */
+export async function isModelAllowedBackend(allowedModels, providerOrFullId, model = null) {
+  if (!allowedModels || !Array.isArray(allowedModels) || allowedModels.length === 0) {
+    return true;
+  }
+
+  let provider = providerOrFullId;
+  let modelId = model;
+
+  if (!modelId && typeof providerOrFullId === "string" && providerOrFullId.includes("/")) {
+    const parts = providerOrFullId.split("/");
+    provider = parts[0];
+    modelId = parts.slice(1).join("/");
+  }
+
+  if (!provider || !modelId) {
+    // If we only have a model name without provider (e.g. combo or alias), check it directly
+    return isModelAllowed(allowedModels, providerOrFullId);
+  }
+
+  const names = new Set();
+  names.add(`${provider}/${modelId}`);
+
+  // Built-in alias (e.g. gemini for google, cc for claude)
+  try {
+    const alias = getProviderAlias(provider);
+    if (alias) {
+      names.add(`${alias}/${modelId}`);
+    }
+  } catch (e) {}
+
+  // Custom provider prefix (e.g. user prefix for openai-compatible)
+  if (provider.startsWith("openai-compatible-") || 
+      provider.startsWith("anthropic-compatible-") || 
+      provider.startsWith("custom-embedding-")) {
+    try {
+      const nodes = await getProviderNodes();
+      const matchedNode = nodes.find(node => node.id === provider);
+      if (matchedNode?.prefix) {
+        names.add(`${matchedNode.prefix}/${modelId}`);
+      }
+    } catch (e) {}
+  }
+
+  return Array.from(names).some(name => isModelAllowed(allowedModels, name));
 }
