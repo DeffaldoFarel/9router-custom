@@ -115,7 +115,7 @@ async function runHeavyStartup() {
 }
 
 function hasQuotaAutoPingEnabled(settings) {
-  return [settings?.claudeAutoPing, settings?.codexAutoPing]
+  return [settings?.claudeAutoPing, settings?.codexAutoPing, settings?.antigravityAutoPing]
     .some((config) => Object.values(config?.connections || {}).some(Boolean));
 }
 
