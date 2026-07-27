@@ -22,7 +22,7 @@ Setiap API Key dapat dikonfigurasi untuk membatasi model mana saja yang bisa dia
 | **Search** | Pencarian model berlaku pada kedua kolom. |
 | **Hybrid Save Format** | Jika seluruh model provider diizinkan, disimpan sebagai `provider/*`; jika sebagian, disimpan sebagai daftar model eksplisit. |
 | **Explicit Deny-All** | Jika semua model dipindahkan ke Restricted, disimpan sebagai sentinel internal `["__none__"]`; array kosong `[]` tetap berarti unrestricted demi backward compatibility. |
-| **Allowed Count Badge** | Menampilkan jumlah model yang diizinkan di setiap API Key, misalnya `All 100 Models` atau `12 of 100 Models`. |
+| **Allowed Count Badge** | Menampilkan jumlah model yang diizinkan di setiap API Key, misalnya `All 100 Models` (jika unrestricted atau semua model diizinkan, misal 21 dari 21) atau `12 of 100 Models`. |
 | **Unavailable Pattern Marker** | Pattern lama tetap disimpan, tetapi diberi label seperti `Provider disabled`, `Provider unavailable`, atau `Model unavailable`. |
 | **404 Response** | Jika model tidak diizinkan, return 404 "Model not found" (bukan 403 "Not allowed") |
 | **Models Endpoint Filter** | `GET /v1/models` hanya return model yang diizinkan untuk API Key tersebut |
