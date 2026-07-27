@@ -95,6 +95,8 @@ export function useModelGrouping({
   }, [filteredActiveProviders]);
 
   // Group models by provider with priority order
+  const noAuthProviderIds = useMemo(() => Object.keys(FREE_PROVIDERS).filter((id) => FREE_PROVIDERS[id]?.noAuth), []);
+
   const groupedModels = useMemo(() => {
     const groups = {};
     const allProviders = { ...OAUTH_PROVIDERS, ...FREE_PROVIDERS, ...FREE_TIER_PROVIDERS, ...APIKEY_PROVIDERS };
@@ -113,13 +115,13 @@ export function useModelGrouping({
     const connectionSource = allConnections.length > 0 ? allConnections : (fetchedConnections.length > 0 ? fetchedConnections : activeProviders);
     const disabledNoAuthIds = new Set(
       connectionSource
-        .filter((c) => (c.isActive === false || c.isActive === 0) && NO_AUTH_PROVIDER_IDS.includes(c.provider))
+        .filter((c) => (c.isActive === false || c.isActive === 0) && noAuthProviderIds.includes(c.provider))
         .map((c) => c.provider)
     );
 
     const noAuthIds = (kindFilter
-      ? NO_AUTH_PROVIDER_IDS.filter((id) => (AI_PROVIDERS[id]?.serviceKinds || ["llm"]).includes(kindFilter))
-      : NO_AUTH_PROVIDER_IDS).filter((id) => !disabledNoAuthIds.has(id));
+      ? noAuthProviderIds.filter((id) => (AI_PROVIDERS[id]?.serviceKinds || ["llm"]).includes(kindFilter))
+      : noAuthProviderIds).filter((id) => !disabledNoAuthIds.has(id));
 
     const providerIdsToShow = new Set([...activeConnectionIds, ...noAuthIds]);
 
