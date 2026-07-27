@@ -5,8 +5,6 @@ import {
   getProviderAlias,
   isOpenAICompatibleProvider,
   isAnthropicCompatibleProvider,
-  NO_AUTH_PROVIDER_IDS,
-  PROVIDER_ORDER,
   AI_PROVIDERS,
   FREE_PROVIDERS,
   FREE_TIER_PROVIDERS,
@@ -96,6 +94,12 @@ export function useModelGrouping({
 
   // Group models by provider with priority order
   const noAuthProviderIds = useMemo(() => Object.keys(FREE_PROVIDERS).filter((id) => FREE_PROVIDERS[id]?.noAuth), []);
+  const providerOrder = useMemo(() => [
+    ...Object.keys(OAUTH_PROVIDERS),
+    ...Object.keys(FREE_PROVIDERS),
+    ...Object.keys(FREE_TIER_PROVIDERS),
+    ...Object.keys(APIKEY_PROVIDERS),
+  ], []);
 
   const groupedModels = useMemo(() => {
     const groups = {};
@@ -126,8 +130,8 @@ export function useModelGrouping({
     const providerIdsToShow = new Set([...activeConnectionIds, ...noAuthIds]);
 
     const sortedProviderIds = [...providerIdsToShow].sort((a, b) => {
-      const indexA = PROVIDER_ORDER.indexOf(a);
-      const indexB = PROVIDER_ORDER.indexOf(b);
+      const indexA = providerOrder.indexOf(a);
+      const indexB = providerOrder.indexOf(b);
       return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
     });
 
@@ -306,7 +310,7 @@ export function useModelGrouping({
     });
 
     return groups;
-  }, [filteredActiveProviders, modelAliases, providerNodes, customModels, disabledModels, kindFilter, activeProviders, allConnections, fetchedConnections, cursorModels]);
+  }, [filteredActiveProviders, modelAliases, providerNodes, customModels, disabledModels, kindFilter, activeProviders, allConnections, fetchedConnections, cursorModels, noAuthProviderIds, providerOrder]);
 
   // Report calculated models
   useEffect(() => {
