@@ -700,6 +700,7 @@ export default function APIPageClient({ machineId }) {
     const allowed = Array.isArray(key.allowedModels) ? key.allowedModels : [];
     if (allowed.length === 0 || allowed.includes("*")) return `All ${labelTotal}`;
     const count = exactAvailableModels.modelIds.filter((modelId) => isModelAllowed(allowed, modelId)).length;
+    if (total > 0 && count === total) return `All ${labelTotal}`;
     return `${count} of ${labelTotal}`;
   };
 
