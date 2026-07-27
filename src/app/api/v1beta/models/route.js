@@ -1,6 +1,12 @@
 import { PROVIDER_MODELS } from "@/shared/constants/models";
-import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
+import { isValidApiKey } from "@/sse/services/auth";
 import { isModelAllowedBackend } from "@/sse/services/model";
+
+function extractModelsApiKey(request) {
+  const authorization = request?.headers?.get?.("Authorization");
+  if (authorization?.startsWith("Bearer ")) return authorization.slice(7);
+  return request?.headers?.get?.("x-api-key") || request?.headers?.get?.("x-goog-api-key") || null;
+}
 
 /**
  * Handle CORS preflight
@@ -23,9 +29,9 @@ export async function GET(request) {
   try {
     let models = [];
     const seen = new Set();
-
-    // Check API Key restrictions
-    const apiKey = extractApiKey(request);
+    // Check API Key restrictions when an HTTP request object is available.
+    // Keeping request optional preserves direct/internal GET() callers.
+    const apiKey = extractModelsApiKey(request);
     let allowedModelsFilter = [];
     if (apiKey) {
       const keyRecord = await isValidApiKey(apiKey, true);

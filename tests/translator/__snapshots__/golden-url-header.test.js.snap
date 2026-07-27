@@ -38,6 +38,25 @@ exports[`GOLDEN buildHeaders (default executor providers) > alicode-intl → hea
 }
 `;
 
+exports[`GOLDEN buildHeaders (default executor providers) > alims-intl → headers (apiKey / oauth) 1`] = `
+{
+  "apiKey": {
+    "Accept": "text/event-stream",
+    "Authorization": "Bearer <TOK>",
+    "Content-Type": "application/json",
+  },
+  "nonStream": {
+    "Authorization": "Bearer <TOK>",
+    "Content-Type": "application/json",
+  },
+  "oauth": {
+    "Accept": "text/event-stream",
+    "Authorization": "Bearer <TOK>",
+    "Content-Type": "application/json",
+  },
+}
+`;
+
 exports[`GOLDEN buildHeaders (default executor providers) > anthropic → headers (apiKey / oauth) 1`] = `
 {
   "apiKey": {
@@ -275,10 +294,10 @@ exports[`GOLDEN buildHeaders (default executor providers) > clinepass → header
     "Authorization": "Bearer <TOK>",
     "Content-Type": "application/json",
     "HTTP-Referer": "https://cline.bot",
-    "User-Agent": "9Router/0.5.30",
+    "User-Agent": "9Router/0.5.40",
     "X-CLIENT-TYPE": "9router",
-    "X-CLIENT-VERSION": "0.5.30",
-    "X-CORE-VERSION": "0.5.30",
+    "X-CLIENT-VERSION": "0.5.40",
+    "X-CORE-VERSION": "0.5.40",
     "X-IS-MULTIROOT": "false",
     "X-PLATFORM": "win32",
     "X-PLATFORM-VERSION": "v24.13.0",
@@ -288,10 +307,10 @@ exports[`GOLDEN buildHeaders (default executor providers) > clinepass → header
     "Authorization": "Bearer <TOK>",
     "Content-Type": "application/json",
     "HTTP-Referer": "https://cline.bot",
-    "User-Agent": "9Router/0.5.30",
+    "User-Agent": "9Router/0.5.40",
     "X-CLIENT-TYPE": "9router",
-    "X-CLIENT-VERSION": "0.5.30",
-    "X-CORE-VERSION": "0.5.30",
+    "X-CLIENT-VERSION": "0.5.40",
+    "X-CORE-VERSION": "0.5.40",
     "X-IS-MULTIROOT": "false",
     "X-PLATFORM": "win32",
     "X-PLATFORM-VERSION": "v24.13.0",
@@ -302,10 +321,10 @@ exports[`GOLDEN buildHeaders (default executor providers) > clinepass → header
     "Authorization": "Bearer <TOK>",
     "Content-Type": "application/json",
     "HTTP-Referer": "https://cline.bot",
-    "User-Agent": "9Router/0.5.30",
+    "User-Agent": "9Router/0.5.40",
     "X-CLIENT-TYPE": "9router",
-    "X-CLIENT-VERSION": "0.5.30",
-    "X-CORE-VERSION": "0.5.30",
+    "X-CLIENT-VERSION": "0.5.40",
+    "X-CORE-VERSION": "0.5.40",
     "X-IS-MULTIROOT": "false",
     "X-PLATFORM": "win32",
     "X-PLATFORM-VERSION": "v24.13.0",
@@ -553,30 +572,24 @@ exports[`GOLDEN buildHeaders (default executor providers) > grok-cli → headers
     "Accept": "text/event-stream",
     "Authorization": "Bearer <TOK>",
     "Content-Type": "application/json",
-    "User-Agent": "grok-pager/0.2.93 grok-shell/0.2.93 (linux; x86_64)",
-    "x-authenticateresponse": "authenticate-response",
-    "x-grok-client-identifier": "grok-pager",
-    "x-grok-client-version": "0.2.93",
-    "x-xai-token-auth": "xai-grok-cli",
+    "User-Agent": "grok-shell/0.2.99 (linux; x86_64)",
+    "x-grok-client-identifier": "grok-shell",
+    "x-grok-client-version": "0.2.99",
   },
   "nonStream": {
     "Authorization": "Bearer <TOK>",
     "Content-Type": "application/json",
-    "User-Agent": "grok-pager/0.2.93 grok-shell/0.2.93 (linux; x86_64)",
-    "x-authenticateresponse": "authenticate-response",
-    "x-grok-client-identifier": "grok-pager",
-    "x-grok-client-version": "0.2.93",
-    "x-xai-token-auth": "xai-grok-cli",
+    "User-Agent": "grok-shell/0.2.99 (linux; x86_64)",
+    "x-grok-client-identifier": "grok-shell",
+    "x-grok-client-version": "0.2.99",
   },
   "oauth": {
     "Accept": "text/event-stream",
     "Authorization": "Bearer <TOK>",
     "Content-Type": "application/json",
-    "User-Agent": "grok-pager/0.2.93 grok-shell/0.2.93 (linux; x86_64)",
-    "x-authenticateresponse": "authenticate-response",
-    "x-grok-client-identifier": "grok-pager",
-    "x-grok-client-version": "0.2.93",
-    "x-xai-token-auth": "xai-grok-cli",
+    "User-Agent": "grok-shell/0.2.99 (linux; x86_64)",
+    "x-grok-client-identifier": "grok-shell",
+    "x-grok-client-version": "0.2.99",
   },
 }
 `;
@@ -1112,6 +1125,13 @@ exports[`GOLDEN buildUrl (default executor providers) > alicode-intl → url (st
 {
   "nonStream": "https://coding-intl.dashscope.aliyuncs.com/v1/chat/completions",
   "stream": "https://coding-intl.dashscope.aliyuncs.com/v1/chat/completions",
+}
+`;
+
+exports[`GOLDEN buildUrl (default executor providers) > alims-intl → url (stream + non-stream) 1`] = `
+{
+  "nonStream": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+  "stream": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
 }
 `;
 
