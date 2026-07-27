@@ -263,6 +263,27 @@ Memperbaiki bug tampilan jumlah koneksi (*"No connections"*) pada kartu provider
 
 ---
 
+### 4. Dynamic Model Fetch Suppression untuk Compatible Providers
+
+**Status:** ✅ Implemented
+
+Memperbaiki isu di mana `/v1/models` secara otomatis menembak HTTP GET ke endpoint upstream `/models` milik provider kompatibel (seperti InferHub) dan mengembalikan puluhan model bawaan server mereka yang tidak pernah ditambahkan oleh pengguna ke 9Router.
+
+#### Fitur Detail
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Custom Models Priority** | Jika provider kompatibel sudah memiliki model custom yang dikelola user di UI (`customModels.length > 0`), 9Router akan membatalkan auto-fetch live ke upstream `/models`. |
+| **Clean `/v1/models` Output** | Memastikan response `/v1/models` MURNI hanya mengembalikan model yang memang telah didaftarkan oleh pengguna di UI 9Router (serta menghormati `allowedModels` per API key). |
+
+#### File yang Dimodifikasi
+
+| File | Perubahan |
+|------|-----------|
+| `src/app/api/v1/models/route.js` | Menambahkan kondisi `customModelIds.length === 0` sebelum mengeksekusi `fetchCompatibleModelIds(conn)`. |
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
