@@ -84,7 +84,7 @@ export function useModelGrouping({
   const providerNodes = useMemo(() => {
     return filteredActiveProviders.filter((p) => {
       const pid = p.provider;
-      return isOpenaiCompatibleProvider(pid) || isAnthropicCompatibleProvider(pid);
+      return isOpenAICompatibleProvider(pid) || isAnthropicCompatibleProvider(pid);
     }).map((p) => ({
       id: p.provider,
       name: p.providerSpecificData?.nodeName || p.name || p.provider,
@@ -138,7 +138,7 @@ export function useModelGrouping({
     sortedProviderIds.forEach((providerId) => {
       const alias = getProviderAlias(providerId);
       const providerInfo = allProviders[providerId] || { name: providerId, color: "#666" };
-      const isCustomProvider = isOpenaiCompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
+      const isCustomProvider = isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
 
       if (kindFilter && PROVIDER_AS_MODEL_KINDS.has(kindFilter)) {
         groups[providerId] = {
