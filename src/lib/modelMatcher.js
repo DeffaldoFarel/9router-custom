@@ -6,7 +6,7 @@
  *   - ["*"] = all models explicitly allowed
  *   - ["anthropic/*"] = all models from provider "anthropic"
  *   - ["glm/glm-4.7"] = specific model only
- *   - ["anthropic/*", "glm/glm-4.7"] = provider wildcard + specific model
+ *   - ["__none__"] = no models allowed (explicit deny-all)
  *
  * Model ID format: "provider/modelId" (e.g., "anthropic/claude-sonnet-4-6")
  */
@@ -28,16 +28,20 @@ function matchPattern(pattern, modelId) {
   return pattern === modelId;
 }
 
-/**
- * Check if a model is allowed by the given allowedModels list.
- * @param {string[]|null} allowedModels - Array of patterns, or null/empty for unrestricted
- * @param {string} modelId - Full model ID like "anthropic/claude-sonnet-4-6"
- * @returns {boolean}
- */
 export function isModelAllowed(allowedModels, modelId) {
-  // Empty, null, or non-array = unrestricted
+  // Empty, null, or non-array = unrestricted (legacy/default behavior)
   if (!allowedModels || !Array.isArray(allowedModels) || allowedModels.length === 0) {
     return true;
+  }
+
+  // Explicit deny-all sentinel used by the dual-column picker.
+  if (allowedModels.length === 1 && allowedModels[0] === "__none__") {
+    return false;
+  }
+
+  // Explicit deny-all sentinel used by the dual-column picker.
+  if (allowedModels.length === 1 && allowedModels[0] === "__none__") {
+    return false;
   }
 
   return allowedModels.some((pattern) => matchPattern(pattern, modelId));
