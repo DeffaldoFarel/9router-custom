@@ -1,16 +1,18 @@
-# Custom Features - GenflowAi
+# Custom Features & Modifications - GenflowAi
 
-Fitur-fitur custom yang ditambahkan pada project ini (tidak ada di upstream GenflowAi original).
+Dokumentasi fitur custom, perbaikan (fixes), dan penyesuaian (adjustments) yang ditambahkan pada project ini (di luar upstream 9Router original).
 
 ---
 
-## 1. Allowed Model per API Key
+## 🚀 Custom Features
+
+### 1. Allowed Model per API Key
 
 **Status:** ✅ Implemented
 
 Setiap API Key dapat dikonfigurasi untuk membatasi model mana saja yang bisa diakses.
 
-### Fitur Detail
+#### Fitur Detail
 
 | Fitur | Deskripsi |
 |-------|-----------|
@@ -24,7 +26,7 @@ Setiap API Key dapat dikonfigurasi untuk membatasi model mana saja yang bisa dia
 | **Models Endpoint Filter** | `GET /v1/models` hanya return model yang diizinkan untuk API Key tersebut |
 | **Combo Filtering** | Combo models juga difilter berdasarkan allowed models |
 
-### Contoh Penggunaan
+#### Contoh Penggunaan
 
 ```bash
 # Create API Key dengan batasan model
@@ -46,7 +48,16 @@ Authorization: Bearer sk-xxxxx
 # → Hanya glm/* dan minimax/* models yang muncul
 ```
 
-### File yang Dimodifikasi
+#### Pattern Support
+
+| Pattern | Contoh | Deskripsi |
+|---------|--------|-----------|
+| `*` | `*` | Semua model |
+| `provider/*` | `anthropic/*` | Semua model dari provider |
+| `provider/model` | `glm/glm-4.7` | Model spesifik |
+| `[]` (kosong) | `[]` | Unrestricted (default, akses semua) |
+
+#### File yang Dimodifikasi
 
 | File | Perubahan |
 |------|-----------|
@@ -65,24 +76,15 @@ Authorization: Bearer sk-xxxxx
 | `src/shared/components/ModelSelectModal.js` | Fix custom provider models |
 | `src/app/(dashboard)/dashboard/endpoint/EndpointPageClient.js` | Dashboard UI integration |
 
-### Pattern Support
-
-| Pattern | Contoh | Deskripsi |
-|---------|--------|-----------|
-| `*` | `*` | Semua model |
-| `provider/*` | `anthropic/*` | Semua model dari provider |
-| `provider/model` | `glm/glm-4.7` | Model spesifik |
-| `[]` (kosong) | `[]` | Unrestricted (default, akses semua) |
-
 ---
 
-## 2. Test All Models
+### 2. Test All Models (Sequential Provider Model Testing)
 
 **Status:** ✅ Implemented
 
 Tombol "Test All" pada halaman Provider Detail untuk mengetes semua model secara otomatis dan bergantian.
 
-### Fitur Detail
+#### Fitur Detail
 
 | Fitur | Deskripsi |
 |-------|-----------|
@@ -93,11 +95,11 @@ Tombol "Test All" pada halaman Provider Detail untuk mengetes semua model secara
 | **Progress Counter** | Menampilkan jumlah model tersisa: "Testing... (5 left)" |
 | **Result Indicators** | ✅ Hijau = OK, ❌ Merah = Error, ⏳ Kuning = Dalam Antrian |
 
-### Lokasi Tombol
+#### Lokasi Tombol
 
 Tombol "Test All" berada di sebelah kanan tombol "Import from /models" pada halaman Provider Detail (Compatible Models section).
 
-### File yang Dimodifikasi
+#### File yang Dimodifikasi
 
 | File | Perubahan |
 |------|-----------|
@@ -105,13 +107,13 @@ Tombol "Test All" berada di sebelah kanan tombol "Import from /models" pada hala
 
 ---
 
-## 3. Remote CLI Manual Config Availability
+### 3. Remote CLI Manual Config Availability
 
 **Status:** ✅ Implemented
 
 Memungkinkan user untuk mengakses dan mengisi secara manual *endpoint*, *api key*, dan pilihan *model* untuk tools CLI di halaman dashboard meskipun tools tersebut tidak terinstall secara lokal di perangkat host 9Router (misalnya 9Router diletakkan di remote VPS sementara CLI berada di laptop/desktop).
 
-### Fitur Detail
+#### Fitur Detail
 
 | Fitur | Deskripsi |
 |-------|-----------|
@@ -120,7 +122,7 @@ Memungkinkan user untuk mengakses dan mengisi secara manual *endpoint*, *api key
 | **Locked Executables** | Tombol *Apply* (yang mengeksekusi tulis config ke local disk) dan *Reset* tetap disembunyikan/didisable |
 | **Precise Manual Copy** | Modal *Manual Config* kini dapat men-generate konfigurasi spesifik dari pilihan user untuk bisa di-copy & paste ke CLI Tool di remote device |
 
-### File yang Dimodifikasi
+#### File yang Dimodifikasi
 
 Semua komponen `ToolCard` yang berada di `src/app/(dashboard)/dashboard/cli-tools/components/`:
 - `ClaudeToolCard.js`
@@ -138,13 +140,44 @@ Semua komponen `ToolCard` yang berada di `src/app/(dashboard)/dashboard/cli-tool
 
 ---
 
-## 4. Toggle Disable/Enable untuk noAuth Providers
+### 4. Quota Auto-Ping untuk Antigravity (Alternating Models)
+
+**Status:** ✅ Implemented
+
+Mengimplementasikan fitur Quota Auto-Ping pada provider Antigravity (mirip dengan fitur Codex Auto-Ping) untuk menghangatkan jendela kuota rolling secara otomatis. Khusus Antigravity, ping dikirimkan secara bergantian (*alternating*) antara model Gemini dan model Claude karena keduanya memiliki pool kuota terpisah.
+
+#### Fitur Detail
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Sliding Window Detection** | Mendeteksi pergeseran waktu reset (`resetAt` drift >= 30 detik) yang menandakan jendela kuota rolling sebelumnya telah kedaluwarsa. |
+| **Alternating Models Ping** | Mengirimkan ping request secara bergantian antara model `gemini-3-flash` dan `claude-sonnet-4-6` untuk menghangatkan kedua pool kuota sekaligus. |
+| **Scheduler State Tracking** | Menggunakan memori scheduler state (`state`) untuk melacak model terakhir yang di-ping agar giliran ping berikutnya presisi. |
+| **Minimal Payload Size** | Request ping dikirimkan dengan konfigurasi minimal (`maxOutputTokens: 1` dengan prompt `"hi"`) untuk meminimalkan konsumsi kuota. |
+| **Dashboard Controls & Tooltip** | Menambahkan switch toggle "Auto-ping" pada halaman detail provider Antigravity serta halaman Limits dashboard lengkap dengan tooltip deskriptif. |
+
+#### File yang Dimodifikasi
+
+| File | Perubahan |
+|------|-----------|
+| `src/shared/constants/config.js` | Menambahkan konfigurasi `antigravity` di `QUOTA_AUTOPING_CONFIG.providers`. |
+| `src/shared/services/quotaAutoPing.js` | Mengimpor `getAntigravityUsage`, mendefinisikan `sendAntigravityPing`, dan mengimplementasikan logika pergantian model ping berbasis state. |
+| `src/app/api/settings/route.js` | Menambahkan pengecekan `"antigravityAutoPing"` di validasi PATCH settings. |
+| `src/app/(dashboard)/dashboard/providers/[id]/page.js` | Menambahkan `antigravity` ke `AUTO_PING_SETTINGS_KEYS` untuk UI detail page. |
+| `src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js` | Menambahkan key, tooltip, dan reactive state untuk toggle auto-ping Antigravity di tabel Limits. |
+| `tests/unit/quota-auto-ping.test.js` | Menambahkan unit tests khusus Antigravity auto-ping (memverifikasi absence, sliding reset, dan alternating model execution) serta memperbaiki mock dependency. |
+
+---
+
+## 🛠️ Custom Fixes & Adjustments
+
+### 1. Toggle Disable/Enable untuk noAuth Providers
 
 **Status:** ✅ Implemented
 
 Menambahkan fitur toggle (Enable/Disable) untuk _provider_ yang secara default tidak memerlukan autentikasi (`noAuth: true`), seperti Mimo Code Free dan OpenCode Free. Sebelumnya provider ini di-hardcode selalu aktif dan tombol toggle disembunyikan.
 
-### Fitur Detail
+#### Fitur Detail
 
 | Fitur | Deskripsi |
 |-------|-----------|
@@ -154,7 +187,7 @@ Menambahkan fitur toggle (Enable/Disable) untuk _provider_ yang secara default t
 | **SQLite Boolean Compatibility** | Memperbaiki filter `isActive` di seluruh aplikasi untuk memperhitungkan nilai `0` (integer) dari SQLite sebagai "non-aktif", selain nilai `false` (boolean). |
 | **Model Filtering** | Provider yang di-disable tidak akan muncul di modal "Pick Model to Allow" dan endpoint `/v1/models`. |
 
-### File yang Dimodifikasi
+#### File yang Dimodifikasi
 
 | File | Perubahan |
 |------|-----------|
@@ -184,13 +217,13 @@ Menambahkan fitur toggle (Enable/Disable) untuk _provider_ yang secara default t
 
 ---
 
-## 5. cURL Test Section di Endpoint Page
+### 2. cURL Test Section di Endpoint Page
 
 **Status:** ✅ Implemented
 
 Menambahkan section **cURL Test** di halaman `/dashboard/endpoint` tepat di bawah section API Keys untuk memudahkan validasi endpoint 9Router tanpa keluar dari dashboard.
 
-### Fitur Detail
+#### Fitur Detail
 
 | Fitur | Deskripsi |
 |-------|-----------|
@@ -201,7 +234,7 @@ Menambahkan section **cURL Test** di halaman `/dashboard/endpoint` tepat di bawa
 | **Copy Curl** | Tombol copy untuk command `curl` yang sudah lengkap. |
 | **Run Test** | Tombol untuk menjalankan request langsung dan menampilkan response JSON/status di dashboard. |
 
-### File yang Dimodifikasi
+#### File yang Dimodifikasi
 
 | File | Perubahan |
 |------|-----------|
@@ -209,49 +242,20 @@ Menambahkan section **cURL Test** di halaman `/dashboard/endpoint` tepat di bawa
 
 ---
 
-## 6. Quota Auto-Ping untuk Antigravity (Alternating Models)
-
-**Status:** ✅ Implemented
-
-Mengimplementasikan fitur Quota Auto-Ping pada provider Antigravity (mirip dengan fitur Codex Auto-Ping) untuk menghangatkan jendela kuota rolling secara otomatis. Khusus Antigravity, ping dikirimkan secara bergantian (*alternating*) antara model Gemini dan model Claude karena keduanya memiliki pool kuota terpisah.
-
-### Fitur Detail
-
-| Fitur | Deskripsi |
-|-------|-----------|
-| **Sliding Window Detection** | Mendeteksi pergeseran waktu reset (`resetAt` drift >= 30 detik) yang menandakan jendela kuota rolling sebelumnya telah kedaluwarsa. |
-| **Alternating Models Ping** | Mengirimkan ping request secara bergantian antara model `gemini-3-flash` dan `claude-sonnet-4-6` untuk menghangatkan kedua pool kuota sekaligus. |
-| **Scheduler State Tracking** | Menggunakan memori scheduler state (`state`) untuk melacak model terakhir yang di-ping agar giliran ping berikutnya presisi. |
-| **Minimal Payload Size** | Request ping dikirimkan dengan konfigurasi minimal (`maxOutputTokens: 1` dengan prompt `"hi"`) untuk meminimalkan konsumsi kuota. |
-| **Dashboard Controls & Tooltip** | Menambahkan switch toggle "Auto-ping" pada halaman detail provider Antigravity serta halaman Limits dashboard lengkap dengan tooltip deskriptif. |
-
-### File yang Dimodifikasi
-
-| File | Perubahan |
-|------|-----------|
-| `src/shared/constants/config.js` | Menambahkan konfigurasi `antigravity` di `QUOTA_AUTOPING_CONFIG.providers`. |
-| `src/shared/services/quotaAutoPing.js` | Mengimpor `getAntigravityUsage`, mendefinisikan `sendAntigravityPing`, dan mengimplementasikan logika pergantian model ping berbasis state. |
-| `src/app/api/settings/route.js` | Menambahkan pengecekan `"antigravityAutoPing"` di validasi PATCH settings. |
-| `src/app/(dashboard)/dashboard/providers/[id]/page.js` | Menambahkan `antigravity` ke `AUTO_PING_SETTINGS_KEYS` untuk UI detail page. |
-| `src/app/(dashboard)/dashboard/usage/components/ProviderLimits/index.js` | Menambahkan key, tooltip, dan reactive state untuk toggle auto-ping Antigravity di tabel Limits. |
-| `tests/unit/quota-auto-ping.test.js` | Menambahkan unit tests khusus Antigravity auto-ping (memverifikasi absence, sliding reset, dan alternating model execution) serta memperbaiki mock dependency. |
-
----
-
-## 7. Dual-Auth Provider Stats Aggregation di Providers List
+### 3. Dual-Auth Provider Stats Aggregation di Providers List
 
 **Status:** ✅ Implemented
 
 Memperbaiki bug tampilan jumlah koneksi (*"No connections"*) pada kartu provider dual-auth (seperti CodeBuddy CN) di halaman `Dashboard > Providers`.
 
-### Fitur Detail
+#### Fitur Detail
 
 | Fitur | Deskripsi |
 |-------|-----------|
 | **Dual-Auth Connection Aggregation** | Kartu provider yang mendukung auth mode `oauth` dan `apikey` (misal `codebuddy-cn`) secara otomatis menghitung akumulasi statistik dari semua jenis koneksi (`["oauth", "apikey", "api_key"]`). |
 | **Accurate Card Status Badge** | Menampilkan badge jumlah koneksi aktif dan error yang presisi pada halaman daftar provider meskipun pengguna menambahkan koneksi berbasis API Key pada provider berkategori OAuth. |
 
-### File yang Dimodifikasi
+#### File yang Dimodifikasi
 
 | File | Perubahan |
 |------|-----------|
