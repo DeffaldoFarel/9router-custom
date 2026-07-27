@@ -238,6 +238,27 @@ Mengimplementasikan fitur Quota Auto-Ping pada provider Antigravity (mirip denga
 
 ---
 
+## 7. Dual-Auth Provider Stats Aggregation di Providers List
+
+**Status:** ✅ Implemented
+
+Memperbaiki bug tampilan jumlah koneksi (*"No connections"*) pada kartu provider dual-auth (seperti CodeBuddy CN) di halaman `Dashboard > Providers`.
+
+### Fitur Detail
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Dual-Auth Connection Aggregation** | Kartu provider yang mendukung auth mode `oauth` dan `apikey` (misal `codebuddy-cn`) secara otomatis menghitung akumulasi statistik dari semua jenis koneksi (`["oauth", "apikey", "api_key"]`). |
+| **Accurate Card Status Badge** | Menampilkan badge jumlah koneksi aktif dan error yang presisi pada halaman daftar provider meskipun pengguna menambahkan koneksi berbasis API Key pada provider berkategori OAuth. |
+
+### File yang Dimodifikasi
+
+| File | Perubahan |
+|------|-----------|
+| `src/app/(dashboard)/dashboard/providers/page.js` | Mengubah penentuan `authTypes` saat merender kartu provider OAuth agar mencakup `apikey` jika provider mendukung `authModes` dual-auth. |
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
