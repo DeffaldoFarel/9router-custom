@@ -284,6 +284,27 @@ Memperbaiki isu di mana `/v1/models` secara otomatis menembak HTTP GET ke endpoi
 
 ---
 
+### 5. Disabled Model Filtering dengan Provider ID Fallback (Kiro)
+
+**Status:** ✅ Implemented
+
+Memperbaiki bug di mana model yang di-disable di UI tidak tersaring keluar dari response `/v1/models` karena mismatch antara key alias penyimpanan database (`providerId`: `kiro`) dan alias render (`kr`).
+
+#### Fitur Detail
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| **Triple-Alias Filtering** | Pengecekan `isDisabled` diperluas dari 2 alias (`outputAlias` + `staticAlias`) menjadi 3 alias (`outputAlias` + `staticAlias` + `providerId`), memastikan model yang di-disable lewat UI (yang menyimpan dengan key `providerId`) juga tersaring di endpoint `/v1/models`. |
+| **Clean `/v1/models` for Kiro** | Saat user men-disable model Kiro di UI (misal menyisakan 1 model aktif), `/v1/models` hanya mengembalikan model yang masih enabled — tidak lagi membocorkan model disabled. |
+
+#### File yang Dimodifikasi
+
+| File | Perubahan |
+|------|-----------|
+| `src/app/api/v1/models/route.js` | Menambahkan `isDisabled(providerId, modelId)` sebagai kondisi ketiga dalam filter disabled models di `buildModelsList`. |
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
