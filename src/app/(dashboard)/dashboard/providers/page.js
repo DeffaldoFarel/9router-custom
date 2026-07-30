@@ -167,7 +167,6 @@ export default function ProvidersPage() {
   }, []);
 
   const getProviderStats = (providerId, authType) => {
-    const isNoAuth = FREE_PROVIDERS[providerId]?.noAuth || FREE_TIER_PROVIDERS[providerId]?.noAuth;
     const authTypes = Array.isArray(authType) ? authType : [authType];
     const providerConnections = connections.filter(
       (c) => c.provider === providerId && authTypes.includes(c.authType),
@@ -197,8 +196,13 @@ export default function ProvidersPage() {
 
     const error = errorConns.length;
     const total = providerConnections.length;
-    const allDisabled = (total > 0 && providerConnections.every((c) => c.isActive === false)) ||
-        (total === 1 && !!isNoAuth && (providerConnections[0]?.isActive === false || providerConnections[0]?.isActive === 0));
+    // SQLite may return disabled as either false or 0. This applies to the
+    // dummy connection used to persist noAuth provider state as well.
+    const allDisabled =
+      total > 0 &&
+      providerConnections.every(
+        (connection) => connection.isActive === false || connection.isActive === 0,
+      );
 
     const latestError = errorConns.sort(
       (a, b) => new Date(b.lastErrorAt || 0) - new Date(a.lastErrorAt || 0),
@@ -311,6 +315,17 @@ export default function ProvidersPage() {
     }))
     .filter((p) => matchSearch(p.name));
 
+  // noAuth providers use their persisted dummy connection with authType "free".
+  // Dual-auth providers store API keys as "apikey" and sometimes "api_key";
+  // include all forms so card totals and toggles match the detail page.
+  const dualAuthTypes = (info, key) => {
+    if (info?.noAuth) return "free";
+    if (key === "kiro") return ["oauth", "apikey", "api_key"];
+    const modes = info?.authModes;
+    if (!Array.isArray(modes) || !modes.includes("apikey")) return "oauth";
+    return ["oauth", "apikey", "api_key"];
+  };
+
   const oauthEntries = sortByPriority(
     Object.entries(OAUTH_PROVIDERS).filter(([, info]) => !info.hidden && matchSearch(info.name)),
     "oauth",
@@ -318,15 +333,27 @@ export default function ProvidersPage() {
   const freeEntries = Object.entries(FREE_PROVIDERS)
     .filter(([, info]) => !info.hidden && matchSearch(info.name))
     .sort(([, a], [, b]) => (b.noAuth ? 1 : 0) - (a.noAuth ? 1 : 0));
-  const freeTierEntries = sortByPriority(
-    Object.entries(FREE_TIER_PROVIDERS).filter(
+  // Free Tier cards may be oauth-only (e.g. kimchi) or dual-auth, so count via
+  // dualAuthTypes per provider instead of a fixed "apikey" — otherwise oauth
+  // connections are invisible here (mismatch with the detail page).
+  const freeTierEntries = Object.entries(FREE_TIER_PROVIDERS)
+    .filter(
       ([, info]) =>
         !info.hidden &&
         matchSearch(info.name) &&
         (info.serviceKinds ?? ["llm"]).includes("llm"),
-    ),
-    "freeTier",
-  ).sort(([, a], [, b]) => (b.noAuth ? 1 : 0) - (a.noAuth ? 1 : 0));
+    )
+    .sort(([ka, a], [kb, b]) => {
+      const pa = a.priority ?? 999;
+      const pb = b.priority ?? 999;
+      if (pa !== pb) return pa - pb;
+      const noAuthDiff = (b.noAuth ? 1 : 0) - (a.noAuth ? 1 : 0);
+      if (noAuthDiff !== 0) return noAuthDiff;
+      const ca = getProviderStats(ka, dualAuthTypes(a, ka)).connected > 0 ? 0 : 1;
+      const cb = getProviderStats(kb, dualAuthTypes(b, kb)).connected > 0 ? 0 : 1;
+      if (ca !== cb) return ca - cb;
+      return (a.name || "").localeCompare(b.name || "");
+    });
   // API Key: connected providers first, then alphabetical by name
   const apikeyEntries = Object.entries(APIKEY_PROVIDERS)
     .filter(
@@ -459,16 +486,15 @@ export default function ProvidersPage() {
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
           {oauthEntries.map(([key, info]) => {
-            const supportsApiKey = !!info?.authModes?.includes("apikey");
-            const oauthAuthTypes = supportsApiKey ? ["oauth", "apikey", "api_key"] : "oauth";
+            const authTypes = dualAuthTypes(info, key);
             return (
               <ProviderCard
                 key={key}
                 providerId={key}
                 provider={info}
-                stats={getProviderStats(key, oauthAuthTypes)}
+                stats={getProviderStats(key, authTypes)}
                 authType="oauth"
-                onToggle={(active) => handleToggleProvider(key, oauthAuthTypes, active)}
+                onToggle={(active) => handleToggleProvider(key, authTypes, active)}
               />
             );
           })}
@@ -502,38 +528,41 @@ export default function ProvidersPage() {
             {testingMode === "free" ? "Testing..." : "Test All"}
           </button>
         </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-            {freeEntries.map(([key, info]) => {
-              // Kiro accepts both OAuth and api-key connections; count/toggle both
-              // so the card total matches the provider detail page (#kiro-apikey).
-              // Kiro's headless api-key flow persists authType "api_key" (underscore),
-              // while generic apikey providers use "apikey" – include both spellings.
-              // For purely noAuth providers like Mimo Code Free / OpenCode Free, authType is "free".
-              const freeAuthTypes =
-                key === "kiro" ? ["oauth", "apikey", "api_key"] : (info.noAuth ? "free" : "oauth");
-              return (
-                <ProviderCard
-                  key={key}
-                  providerId={key}
-                  provider={info}
-                  stats={getProviderStats(key, freeAuthTypes)}
-                  authType="free"
-                  onToggle={(active) =>
-                    handleToggleProvider(key, freeAuthTypes, active)
-                  }
-                />
-              );
-            })}
-            {freeTierEntries.map(([key, info]) => (
-            <ApiKeyProviderCard
-              key={key}
-              providerId={key}
-              provider={info}
-              stats={getProviderStats(key, "apikey")}
-              authType="apikey"
-              onToggle={(active) => handleToggleProvider(key, "apikey", active)}
-            />
-          ))}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          {freeEntries.map(([key, info]) => {
+            const freeAuthTypes = dualAuthTypes(info, key);
+            return (
+              <ProviderCard
+                key={key}
+                providerId={key}
+                provider={info}
+                stats={getProviderStats(key, freeAuthTypes)}
+                authType="free"
+                onToggle={(active) =>
+                  handleToggleProvider(key, freeAuthTypes, active)
+                }
+              />
+            );
+          })}
+          {freeTierEntries.map(([key, info]) => {
+            const freeAuthTypes = dualAuthTypes(info, key);
+            return (
+              <ApiKeyProviderCard
+                key={key}
+                providerId={key}
+                provider={info}
+                stats={getProviderStats(key, freeAuthTypes)}
+                authType={
+                  Array.isArray(freeAuthTypes)
+                    ? (freeAuthTypes[0] ?? "apikey")
+                    : freeAuthTypes
+                }
+                onToggle={(active) =>
+                  handleToggleProvider(key, freeAuthTypes, active)
+                }
+              />
+            );
+          })}
         </div>
       </div>
       )}
