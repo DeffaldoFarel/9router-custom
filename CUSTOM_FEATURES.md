@@ -94,19 +94,7 @@ Tombol "Test All" pada halaman Provider Detail untuk mengetes semua model secara
 
 ---
 
-### 3. Remote CLI Manual Config Availability
-
-**Status:** ✅ Implemented
-
-Memungkinkan endpoint, API key, dan model CLI dipilih serta disalin manual walaupun CLI tidak terinstall pada host 9Router remote.
-
-#### File yang Dimodifikasi
-
-Semua ToolCard di `src/app/(dashboard)/dashboard/cli-tools/components/`, termasuk Claude, Codex, OpenCode, OpenClaw, Cowork, DeepSeek TUI, Droid, Hermes, Jcode, Cline, Kilo, dan Copilot.
-
----
-
-### 4. Quota Auto-Ping untuk Antigravity
+### 3. Quota Auto-Ping untuk Antigravity
 
 **Status:** ✅ Implemented
 
@@ -150,19 +138,7 @@ Endpoint page menyediakan generator dan runner cURL untuk `/v1/models` serta `/v
 
 ---
 
-### 3. Dual-Auth Provider Stats Aggregation
-
-**Status:** ✅ Implemented
-
-Kartu provider dual-auth seperti CodeBuddy CN menghitung koneksi OAuth, API Key, dan `api_key` secara bersamaan agar tidak menampilkan `No connections` secara keliru.
-
-#### File yang Dimodifikasi
-
-`src/app/(dashboard)/dashboard/providers/page.js`
-
----
-
-### 4. Dynamic Model Fetch Suppression untuk Compatible Providers
+### 3. Dynamic Model Fetch Suppression untuk Compatible Providers
 
 **Status:** ✅ Implemented
 
@@ -174,7 +150,7 @@ Jika compatible provider sudah mempunyai `customModels` di 9Router, endpoint `/v
 
 ---
 
-### 5. Disabled Model Filtering dengan Provider ID Fallback (Kiro)
+### 4. Disabled Model Filtering dengan Provider ID Fallback (Kiro)
 
 **Status:** ✅ Implemented
 
