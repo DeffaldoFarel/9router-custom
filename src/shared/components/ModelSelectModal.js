@@ -32,6 +32,7 @@ export default function ModelSelectModal({
   title = "Select Model",
   modelAliases = {},
   kindFilter = null,
+  capFilter = null,
   addedModelValues = [],
   closeOnSelect = true,
   allowedModelsFilter = [],
@@ -67,7 +68,7 @@ export default function ModelSelectModal({
   );
 
   useEffect(() => {
-    if (!isOpen || cursorConnectionIds.length === 0) {
+    if (!shouldFetchModalData || cursorConnectionIds.length === 0) {
       setCursorModels([]);
       return undefined;
     }
@@ -95,7 +96,7 @@ export default function ModelSelectModal({
       });
 
     return () => { cancelled = true; };
-  }, [isOpen, cursorConnectionIds]);
+  }, [shouldFetchModalData, cursorConnectionIds]);
 
   const fetchCombos = async () => {
     try {
@@ -427,56 +428,48 @@ export default function ModelSelectModal({
     return groups;
   }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, allConnections, fetchedConnections, cursorModels]);
 
-  // Filter combos by search query (and hide combos when kindFilter is set — combos are LLM-only by design)
-  // AND filter by allowedModelsFilter if provided
+  // Filter combos by search query and per-key model access. Combos are LLM-only
+  // and do not expose capability metadata, so hide them for kind/capability pickers.
   const filteredCombos = useMemo(() => {
-    if (kindFilter) return [];
-    
+    if (kindFilter || capFilter) return [];
+
     let filtered = combos;
+    if (allowedModelsFilter.length > 0) {
+      filtered = filtered.filter((combo) =>
+        isModelAllowed(allowedModelsFilter, combo.name)
+      );
+    }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = combos.filter(c => c.name.toLowerCase().includes(query));
+      filtered = filtered.filter((combo) =>
+        combo.name.toLowerCase().includes(query)
+      );
     }
-    
-    if (allowedModelsFilter.length > 0) {
-      filtered = filtered.filter(c => isModelAllowed(allowedModelsFilter, c.name));
-    }
-    
     return filtered;
-  }, [combos, searchQuery, kindFilter, allowedModelsFilter]);
+  }, [combos, searchQuery, kindFilter, capFilter, allowedModelsFilter]);
 
-  // Report the total calculated models to the parent component (for accurate counting/badges)
+  // Report the unsearched, unrestricted catalog to the parent for accurate
+  // "allowed out of total" badges. Capability pickers intentionally omit combos.
   useEffect(() => {
     if (!onModelsCalculated) return;
-    
-    // We only want the total base models ignoring the search query and the allowed models filter
-    // so the badge can calculate how many are allowed OUT OF the actual total.
-    let totalBaseModels = 0;
-    
-    // Count all models across all provider groups
-    Object.values(groupedModels).forEach(group => {
-      totalBaseModels += group.models.length;
-    });
-    
-    // Add combos if not filtered out by kind
-    if (!kindFilter) {
-      totalBaseModels += combos.length;
-    }
-    
-    // Also build a flat array of all base model IDs so the parent can check against allowedModels
+
     const allBaseModelIds = [];
-    Object.values(groupedModels).forEach(group => {
-      group.models.forEach(m => allBaseModelIds.push(m.value));
+    Object.values(groupedModels).forEach((group) => {
+      group.models.forEach((model) => {
+        if (!capFilter || getCaps(model.value)?.[capFilter] === true) {
+          allBaseModelIds.push(model.value);
+        }
+      });
     });
-    if (!kindFilter) {
-      combos.forEach(c => allBaseModelIds.push(c.name));
+    if (!kindFilter && !capFilter) {
+      combos.forEach((combo) => allBaseModelIds.push(combo.name));
     }
-    
+
     onModelsCalculated({
-      total: totalBaseModels,
-      modelIds: allBaseModelIds
+      total: allBaseModelIds.length,
+      modelIds: allBaseModelIds,
     });
-  }, [groupedModels, combos, kindFilter, onModelsCalculated]);
+  }, [groupedModels, combos, kindFilter, capFilter, getCaps, onModelsCalculated]);
 
   // Sort models alphabetically, with added models floated to top
   const sortModels = (models) => {
@@ -492,10 +485,17 @@ export default function ModelSelectModal({
     const filtered = {};
     Object.entries(groupedModels).forEach(([providerId, group]) => {
       let models = group.models;
-      
+
+      // Filter by input-modality capability (vision/pdf/audioInput/videoInput).
+      if (capFilter) {
+        models = models.filter((m) => getCaps(m.value)?.[capFilter] === true);
+        if (models.length === 0) return;
+      }
+
       // Filter by allowedModelsFilter
       if (allowedModelsFilter.length > 0) {
         models = models.filter((m) => isModelAllowed(allowedModelsFilter, m.value));
+        if (models.length === 0) return;
       }
 
       if (query) {
@@ -517,7 +517,7 @@ export default function ModelSelectModal({
     });
 
     return filtered;
-  }, [groupedModels, searchQuery, addedModelValues, allowedModelsFilter]);
+  }, [groupedModels, searchQuery, addedModelValues, allowedModelsFilter, capFilter, getCaps]);
 
   const handleSelect = (model) => {
     const value = model?.value || model?.name || model;
@@ -711,6 +711,7 @@ ModelSelectModal.propTypes = {
   title: PropTypes.string,
   modelAliases: PropTypes.object,
   kindFilter: PropTypes.string,
+  capFilter: PropTypes.string,
   addedModelValues: PropTypes.arrayOf(PropTypes.string),
   closeOnSelect: PropTypes.bool,
   allowedModelsFilter: PropTypes.arrayOf(PropTypes.string),

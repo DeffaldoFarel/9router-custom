@@ -7,7 +7,6 @@ import {
   extractApiKey,
   isValidApiKey,
 } from "../services/auth.js";
-import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
 import { getSettings } from "@/lib/localDb";
 import { getModelInfo, getComboModels, isModelAllowedBackend } from "../services/model.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
@@ -15,14 +14,48 @@ import { DEFAULT_HEADROOM_URL } from "@/lib/headroom/detect";
 import { getTransform as getPxpipeTransform } from "@/lib/pxpipe/loader.js";
 import { appendPxpipeEvent } from "@/lib/pxpipe/events.js";
 import { errorResponse, unavailableResponse } from "open-sse/utils/error.js";
-import { handleComboChat, handleFusionChat } from "open-sse/services/combo.js";
+import { handleComboChat, handleFusionChat, detectRequiredCapabilities } from "open-sse/services/combo.js";
+import { augmentModelsWithCapacityAdapter, withCapacityAdapterStripping, getActiveAdapterStrategy } from "open-sse/services/capacityAdapter.js";
 import { handleBypassRequest } from "open-sse/utils/bypassHandler.js";
 import { HTTP_STATUS } from "open-sse/config/runtimeConfig.js";
 import { detectFormatByEndpoint } from "open-sse/translator/formats.js";
 import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
-import { isModelAllowed, filterComboModels } from "@/lib/modelMatcher.js";
+import { isModelAllowed } from "@/lib/modelMatcher.js";
+
+async function isAllowedForKey(keyRecord, modelStr) {
+  if (!keyRecord?.allowedModels?.length) return true;
+  if (isModelAllowed(keyRecord.allowedModels, modelStr)) return true;
+  const { provider, model } = await getModelInfo(modelStr);
+  if (!provider || !model) return false;
+  return isModelAllowedBackend(keyRecord.allowedModels, provider, model);
+}
+
+async function filterModelsForKey(keyRecord, models) {
+  if (!keyRecord?.allowedModels?.length) return models;
+  const allowed = await Promise.all(models.map((model) => isAllowedForKey(keyRecord, model)));
+  return models.filter((_, index) => allowed[index]);
+}
+
+async function getAuthorizedComboModels(keyRecord, comboName, comboModels) {
+  if (!keyRecord?.allowedModels?.length) return comboModels;
+  if (isModelAllowed(keyRecord.allowedModels, comboName)) return comboModels;
+  return filterModelsForKey(keyRecord, comboModels);
+}
+
+async function authorizeAugmentedModels(keyRecord, originalModels, augmentedModels) {
+  const originalSet = new Set(originalModels);
+  const adapterModels = augmentedModels.filter((model) => !originalSet.has(model));
+  const authorizedAdapters = new Set(await filterModelsForKey(keyRecord, adapterModels));
+  return augmentedModels.filter((model) => originalSet.has(model) || authorizedAdapters.has(model));
+}
+
+async function getAuthorizedFusionJudge(keyRecord, filteredCombo, configuredJudge) {
+  const judge = configuredJudge?.trim();
+  if (!judge || filteredCombo.includes(judge)) return judge || undefined;
+  return (await isAllowedForKey(keyRecord, judge)) ? judge : undefined;
+}
 
 /**
  * Handle chat completion request
@@ -47,8 +80,6 @@ export async function handleChat(request, clientRawRequest = null) {
       headers: Object.fromEntries(request.headers.entries())
     };
   }
-  cacheClaudeHeaders(clientRawRequest.headers);
-
   const modelStr = body.model;
 
   // Request summary is emitted as the unified "▶" line in chatCore (has fmt/thinking/account)
@@ -82,37 +113,42 @@ export async function handleChat(request, clientRawRequest = null) {
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model");
   }
 
-  // Bypass naming/warmup requests before combo rotation to avoid wasting rotation slots
-  const userAgent = request?.headers?.get("user-agent") || "";
-  const bypassResponse = handleBypassRequest(body, modelStr, userAgent, !!settings.ccFilterNaming);
-  if (bypassResponse) return bypassResponse.response || bypassResponse;
-
   // Check if model is a combo (has multiple models with fallback)
   const comboModels = await getComboModels(modelStr);
   if (comboModels) {
-    // Filter combo models by API key allowed models
-    let filteredCombo = comboModels;
-    if (keyRecord?.allowedModels?.length > 0) {
-      const filtered = [];
-      for (const m of comboModels) {
-        if (await isModelAllowedBackend(keyRecord.allowedModels, m.provider, m.model)) {
-          filtered.push(m);
-        }
-      }
-      filteredCombo = filtered;
-      if (filteredCombo.length === 0) {
-        log.info("AUTH", `API key has no access to any models in combo "${modelStr}"`);
-        return errorResponse(HTTP_STATUS.NOT_FOUND, `Model not found: ${modelStr}`);
-      }
+    // A bare combo name saved by the model picker authorizes its configured
+    // original members. Any dynamically injected adapter remains separately gated.
+    const filteredCombo = await getAuthorizedComboModels(keyRecord, modelStr, comboModels);
+    if (filteredCombo.length === 0) {
+      log.info("AUTH", `API key has no access to any models in combo "${modelStr}"`);
+      return errorResponse(HTTP_STATUS.NOT_FOUND, `Model not found: ${modelStr}`);
+    }
+    if (filteredCombo.length !== comboModels.length) {
       log.debug("AUTH", `Combo "${modelStr}" filtered: ${comboModels.length} → ${filteredCombo.length} models`);
     }
+
+    // Synthetic Claude CLI responses are allowed only after the requested combo
+    // route has passed the API-key restriction above.
+    const userAgent = request?.headers?.get("user-agent") || "";
+    const bypassResponse = handleBypassRequest(body, modelStr, userAgent, !!settings.ccFilterNaming);
+    if (bypassResponse) return bypassResponse.response || bypassResponse;
+
+    const requiredCapabilities = detectRequiredCapabilities(body);
 
     // Check for combo-specific strategy first, fallback to global
     const comboStrategies = settings.comboStrategies || {};
     const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
     const comboStrategy = comboSpecificStrategy || settings.comboStrategy || "fallback";
+    const augmentedCandidates = augmentModelsWithCapacityAdapter(filteredCombo, requiredCapabilities, settings);
+    const augmentedModels = await authorizeAugmentedModels(keyRecord, filteredCombo, augmentedCandidates);
+    const adapterAdded = augmentedModels.filter((m) => !filteredCombo.includes(m));
 
     if (comboStrategy === "fusion") {
+      const judgeModel = await getAuthorizedFusionJudge(
+        keyRecord,
+        filteredCombo,
+        comboStrategies[modelStr]?.judgeModel,
+      );
       log.info("CHAT", `Combo "${modelStr}" with ${filteredCombo.length} models (strategy: fusion)`);
       return handleFusionChat({
         body,
@@ -127,17 +163,20 @@ export async function handleChat(request, clientRawRequest = null) {
         },
         log,
         comboName: modelStr,
-        judgeModel: comboStrategies[modelStr]?.judgeModel,
+        judgeModel,
         tuning: comboStrategies[modelStr]?.fusionTuning,
       });
     }
 
     const comboStickyLimit = settings.comboStickyRoundRobinLimit;
-    log.info("CHAT", `Combo "${modelStr}" with ${filteredCombo.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
+    log.info("CHAT", `Combo "${modelStr}" with ${augmentedModels.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
     return handleComboChat({
       body,
-      models: filteredCombo,
-      handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, keyRecord),
+      models: augmentedModels,
+      handleSingleModel: withCapacityAdapterStripping(
+        (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, keyRecord),
+        adapterAdded
+      ),
       log,
       comboName: modelStr,
       comboStrategy,
@@ -145,7 +184,39 @@ export async function handleChat(request, clientRawRequest = null) {
     });
   }
 
-  // Single model request
+  // Reject the requested model before bypass or capacity adaptation. Otherwise a
+  // synthetic response or an allowed adapter could bypass the original restriction.
+  if (!(await isAllowedForKey(keyRecord, modelStr))) {
+    log.info("AUTH", `API key denied access to "${modelStr}" (returning 404)`);
+    return errorResponse(HTTP_STATUS.NOT_FOUND, `Model not found: ${modelStr}`);
+  }
+
+  const userAgent = request?.headers?.get("user-agent") || "";
+  const bypassResponse = handleBypassRequest(body, modelStr, userAgent, !!settings.ccFilterNaming);
+  if (bypassResponse) return bypassResponse.response || bypassResponse;
+
+  const requiredCapabilities = detectRequiredCapabilities(body);
+
+  // Single model request — may still switch to a capacity-adapter model if the
+  // target lacks a capability the request needs (e.g. no vision, request has an image).
+  const soloCandidates = augmentModelsWithCapacityAdapter([modelStr], requiredCapabilities, settings);
+  const soloAugmented = await authorizeAugmentedModels(keyRecord, [modelStr], soloCandidates);
+  if (soloAugmented.length > 1) {
+    const adapterAdded = soloAugmented.filter((m) => m !== modelStr);
+    log.info("CHAT", `Capacity adapter for [${[...requiredCapabilities].join(",")}] on "${modelStr}" → trying ${soloAugmented.join(", ")}`);
+    return handleComboChat({
+      body,
+      models: soloAugmented,
+      handleSingleModel: withCapacityAdapterStripping(
+        (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, keyRecord),
+        adapterAdded
+      ),
+      log,
+      comboName: modelStr,
+      comboStrategy: getActiveAdapterStrategy(requiredCapabilities, settings)
+    });
+  }
+
   return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey, keyRecord);
 }
 
@@ -159,20 +230,10 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
   if (!modelInfo.provider) {
     const comboModels = await getComboModels(modelStr);
     if (comboModels) {
-      // Filter combo models by API key allowed models
-      let filteredCombo = comboModels;
-      if (keyRecord?.allowedModels?.length > 0) {
-        const filtered = [];
-        for (const m of comboModels) {
-          if (await isModelAllowedBackend(keyRecord.allowedModels, m.provider, m.model)) {
-            filtered.push(m);
-          }
-        }
-        filteredCombo = filtered;
-        if (filteredCombo.length === 0) {
-          log.info("AUTH", `API key has no access to any models in combo "${modelStr}"`);
-          return errorResponse(HTTP_STATUS.NOT_FOUND, `Model not found: ${modelStr}`);
-        }
+      const filteredCombo = await getAuthorizedComboModels(keyRecord, modelStr, comboModels);
+      if (filteredCombo.length === 0) {
+        log.info("AUTH", `API key has no access to any models in combo "${modelStr}"`);
+        return errorResponse(HTTP_STATUS.NOT_FOUND, `Model not found: ${modelStr}`);
       }
 
       const chatSettings = await getSettings();
@@ -180,8 +241,17 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       const comboStrategies = chatSettings.comboStrategies || {};
       const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
       const comboStrategy = comboSpecificStrategy || chatSettings.comboStrategy || "fallback";
+      const requiredCapabilities = detectRequiredCapabilities(body);
+      const augmentedCandidates = augmentModelsWithCapacityAdapter(filteredCombo, requiredCapabilities, chatSettings);
+      const augmentedModels = await authorizeAugmentedModels(keyRecord, filteredCombo, augmentedCandidates);
+      const adapterAdded = augmentedModels.filter((m) => !filteredCombo.includes(m));
 
       if (comboStrategy === "fusion") {
+        const judgeModel = await getAuthorizedFusionJudge(
+          keyRecord,
+          filteredCombo,
+          comboStrategies[modelStr]?.judgeModel,
+        );
         log.info("CHAT", `Combo "${modelStr}" with ${filteredCombo.length} models (strategy: fusion)`);
         return handleFusionChat({
           body,
@@ -196,17 +266,20 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
           },
           log,
           comboName: modelStr,
-          judgeModel: comboStrategies[modelStr]?.judgeModel,
+          judgeModel,
           tuning: comboStrategies[modelStr]?.fusionTuning,
         });
       }
 
       const comboStickyLimit = chatSettings.comboStickyRoundRobinLimit;
-      log.info("CHAT", `Combo "${modelStr}" with ${filteredCombo.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
+      log.info("CHAT", `Combo "${modelStr}" with ${augmentedModels.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
       return handleComboChat({
         body,
-        models: filteredCombo,
-        handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, keyRecord),
+        models: augmentedModels,
+        handleSingleModel: withCapacityAdapterStripping(
+          (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey, keyRecord),
+          adapterAdded
+        ),
         log,
         comboName: modelStr,
         comboStrategy,

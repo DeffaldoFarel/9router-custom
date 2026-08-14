@@ -48,14 +48,25 @@ describe("allowed models backend matching", () => {
     expect(await ctx.isModelAllowedBackend([], "openai", "gpt-4")).toBe(true);
   });
 
-  it("matches built-in provider alias", async () => {
+  it("supports global wildcard and dominant explicit deny-all", async () => {
     const ctx = await setupDb();
     cleanup = ctx.cleanup;
 
-    // e.g. "el/*" should allow "elevenlabs/voice-1" because elevenlabs's alias is el
+    expect(await ctx.isModelAllowedBackend(["*"], "openai", "gpt-4")).toBe(true);
+    expect(await ctx.isModelAllowedBackend(["__none__"], "openai", "gpt-4")).toBe(false);
+    expect(await ctx.isModelAllowedBackend(["__none__", "*"], "openai", "gpt-4")).toBe(false);
+  });
+
+  it("matches primary and secondary built-in provider aliases", async () => {
+    const ctx = await setupDb();
+    cleanup = ctx.cleanup;
+
+    // Primary aliases used by the dashboard.
     expect(await ctx.isModelAllowedBackend(["el/*"], "elevenlabs", "voice-1")).toBe(true);
-    // e.g. "cc/*" should allow "claude/claude-3-5-sonnet"
     expect(await ctx.isModelAllowedBackend(["cc/*"], "claude", "claude-3-5-sonnet")).toBe(true);
+    // Secondary/ui aliases accepted by the runtime parser must enforce identically.
+    expect(await ctx.isModelAllowedBackend(["cf/*"], "cloudflare-ai", "@cf/meta/llama-3.2-1b-instruct")).toBe(true);
+    expect(await ctx.isModelAllowedBackend(["xmtp/*"], "xiaomi-tokenplan", "mimo-v2-flash")).toBe(true);
   });
 
   it("matches custom provider prefix", async () => {

@@ -35,12 +35,7 @@ export function isModelAllowed(allowedModels, modelId) {
   }
 
   // Explicit deny-all sentinel used by the dual-column picker.
-  if (allowedModels.length === 1 && allowedModels[0] === "__none__") {
-    return false;
-  }
-
-  // Explicit deny-all sentinel used by the dual-column picker.
-  if (allowedModels.length === 1 && allowedModels[0] === "__none__") {
+  if (allowedModels.includes("__none__")) {
     return false;
   }
 
