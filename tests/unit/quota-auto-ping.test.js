@@ -59,6 +59,8 @@ vi.mock("@/shared/constants/config", () => ({
 }));
 
 vi.mock("open-sse/providers/shared.js", () => ({
+  ANTHROPIC_API_VERSION: "2023-06-01",
+  CLAUDE_CLI_VERSION: "2.1.258",
   CLAUDE_CLI_SPOOF_HEADERS: { "anthropic-version": "2023-06-01" },
   CLAUDE_API_HEADERS: { "anthropic-version": "2023-06-01" },
   ANTIGRAVITY_OAUTH_CLIENT: { clientId: "id", clientSecret: "secret" },
