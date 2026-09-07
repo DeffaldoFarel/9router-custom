@@ -162,6 +162,44 @@ Filter disabled model memeriksa `outputAlias`, `staticAlias`, dan `providerId`, 
 
 ---
 
+## ⚠️ Known Upstream Interactions
+
+### 1. `CopilotToolCard.js` — Dormant sejak upstream v0.5.69
+
+**Status:** 🟡 Preserved but not rendered
+
+Pada upstream v0.5.69 (commit `b84681d5`, _"feat(cli-tools): replace copilot mitm with vscode extension setup guide"_), `copilot` dipindahkan dari `MITM_TOOLS` ke `CLI_TOOLS` dengan `configType: "guide"` (memakai VS Code extension, bukan lagi MITM). Upstream juga menghapus branch `case "copilot"` dari `ToolDetailClient.js`.
+
+Akibatnya:
+
+| Aspek | Kondisi |
+|-------|---------|
+| **File** | `src/app/(dashboard)/dashboard/cli-tools/components/CopilotToolCard.js` tetap ada di disk |
+| **Export** | Masih diekspor dari `components/index.js` (valid, tidak melanggar lint) |
+| **Render** | ❌ Tidak dirender lagi — `copilot` sekarang jatuh ke `DefaultToolCard` (guide steps) |
+| **Custom code** | Filter `allowedModels` (`isModelAllowed`) di dalamnya jadi dorman |
+| **Dampak fungsional** | Tidak ada — halaman guide tidak punya model picker, jadi tidak ada yang perlu difilter |
+
+**Keputusan:** File sengaja **tidak dihapus** agar customization mudah dipulihkan jika suatu saat flow MITM Copilot dikembalikan. Jangan anggap ini dead code yang perlu dibersihkan.
+
+---
+
+### 2. Antigravity quota grouping (upstream v0.5.69)
+
+Upstream menggabungkan quota `gemini-*` dan `claude-*` menjadi 2 baris (`modelKey: "gemini"` / `"claude"`) di `ProviderLimits/utils.js`.
+
+Fitur **Quota Auto-Ping** tidak terpengaruh: auto-ping membaca `getAntigravityUsage()` secara langsung di server dengan `quotaKey: "gemini-3-flash-agent"` (jalur data terpisah dari `parseQuotaData` milik UI), dan toggle-nya per-connection, bukan per-baris quota.
+
+---
+
+### 3. Pattern `allowedModels` yang menjadi stale
+
+Upstream v0.5.69 menghapus beberapa model ID: `glm-5.0-turbo`, `minimax-m2.7`, `kimi-k2.5`, `hy3-preview`, `hy3-x`, `hy4-preview-x`, `deepseek-v3-2-volc` (codebuddy-cn), serta `qmodel_preview`, `gm51model` (qoder).
+
+API Key yang menyimpan pattern ke model-model tersebut akan menampilkan label **"Model unavailable"** — ini perilaku by-design dari _Unavailable Pattern Marker_, bukan regresi. Pattern lama tetap tersimpan agar tidak ada data hilang.
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
