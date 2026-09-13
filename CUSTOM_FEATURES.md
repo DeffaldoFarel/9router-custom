@@ -194,9 +194,25 @@ Fitur **Quota Auto-Ping** tidak terpengaruh: auto-ping membaca `getAntigravityUs
 
 ### 3. Pattern `allowedModels` yang menjadi stale
 
-Upstream v0.5.69 menghapus beberapa model ID: `glm-5.0-turbo`, `minimax-m2.7`, `kimi-k2.5`, `hy3-preview`, `hy3-x`, `hy4-preview-x`, `deepseek-v3-2-volc` (codebuddy-cn), serta `qmodel_preview`, `gm51model` (qoder).
+Upstream v0.5.69 menghapus beberapa model ID: `glm-5.0-turbo`, `minimax-m2.7`, `kimi-k2.5`, `hy3-preview`, `hy3-x`, `hy4-preview-x`, `deepseek-v3-2-volc` (codebuddy-cn), serta `qmodel_preview`, `gm51model` (qoder). Pada upstream v0.5.75, `deepseek-v4-flash` juga digantikan oleh `deepseek-v4.1-flash` (codebuddy-cn & opencode-go).
 
 API Key yang menyimpan pattern ke model-model tersebut akan menampilkan label **"Model unavailable"** — ini perilaku by-design dari _Unavailable Pattern Marker_, bukan regresi. Pattern lama tetap tersimpan agar tidak ada data hilang.
+
+---
+
+### 4. Antigravity weekly quota tracking (upstream v0.5.75)
+
+Upstream v0.5.75 menambahkan pelacakan kuota mingguan Antigravity (`gemini_weekly`, `claude_gpt_weekly`) di dashboard usage melalui `open-sse/services/usage/antigravity-weekly.js` dan `ProviderLimits/utils.js`.
+
+Fitur **Quota Auto-Ping** tetap berjalan normal tanpa konflik: auto-ping beroperasi langsung pada query status sesi server menggunakan target key `gemini-3-flash-agent` (reset rolling 24 jam / sesi sliding), independen dari perhitungan ringkasan mingguan UI.
+
+---
+
+### 5. Live Catalog Cline & ClinePass di `ModelSelectModal.js` (upstream v0.5.75)
+
+Upstream v0.5.75 menambahkan live model fetcher untuk provider `cline` dan `clinepass` via `useLiveProviderModels`.
+
+Integrasi custom pada `src/shared/components/ModelSelectModal.js` diselaraskan agar hook `useLiveProviderModels` menerima argumen `shouldFetchModalData` (bukan hanya `isOpen`), sehingga sinkronisasi dan badge counter `All N Models` di visual model picker tetap menghitung model live Cline/ClinePass secara akurat.
 
 ---
 
