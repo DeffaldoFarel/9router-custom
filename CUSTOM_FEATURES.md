@@ -216,6 +216,30 @@ Integrasi custom pada `src/shared/components/ModelSelectModal.js` diselaraskan a
 
 ---
 
+### 6. Dynamic CLI Tools Config via `GenericCliToolCard.js` (upstream v0.5.85 - v0.5.91)
+
+Upstream menambahkan `GenericCliToolCard.js` untuk konfigurasi dinamis CLI tools baru (Pi, OMP, Crush, ForgeCode, Smelt, CodeWhale).
+
+Fitur **Allowed Model per API Key** diselaraskan ke dalam `GenericCliToolCard.js` dengan menyuntikkan `isModelAllowed`, reactive `useEffect` model filtering (Option A - Strict reset), serta passing prop `allowedModelsFilter` ke `ModelSelectModal`, sehingga model yang dipilih pada CLI tools baru otomatis dibatasi oleh API Key yang aktif.
+
+---
+
+### 7. Multi-Profile Codex CLI & Multi-Role Hermes Config (upstream v0.5.91)
+
+Upstream v0.5.91 menambahkan dukungan multiple model profiles pada Codex CLI (`CodexToolCard.js`) serta slot multi-role pada Hermes Agent (`HermesToolCard.js`).
+
+Custom model restriction (`allowedModelsFilter`) telah diselaraskan ke modal pemilihan profil Codex (`profileModalOpen`) dan modal role Hermes agar pemilihan model tetap terkontrol dan konsisten.
+
+---
+
+### 8. Dukungan Provider Baru (upstream v0.5.79 - v0.5.91)
+
+Upstream v0.5.79 hingga v0.5.91 menambahkan beberapa provider baru: `qoder-cn` (Qoder CN), `tokenharbor` (Token Harbor), `opencode-zen` (OpenCode Zen PAYG), `xiaomi-mimo` (server-assisted desktop login), agregator OpenAI-compatible (`dahl`, `atria`, `agnes`, `bai`), dan lane `System One`.
+
+Semua provider ini langsung terintegrasi secara mulus ke visual model picker `DualColumnModelPicker.js` dan query backend tanpa merusak aturan disabled/allowed models. Pengecekan active connection SQLite (`isActive !== false && isActive !== 0`) juga diperluas ke `qoder-cn`.
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
