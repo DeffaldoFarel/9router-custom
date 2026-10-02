@@ -240,6 +240,38 @@ Semua provider ini langsung terintegrasi secara mulus ke visual model picker `Du
 
 ---
 
+### 9. `requestedModel` di `handleSingleModelChat` (upstream v0.5.95)
+
+Upstream v0.5.95 menambahkan parameter `requestedModel` (posisi ke-6) pada `handleSingleModelChat` di `src/sse/handlers/chat.js` untuk meneruskan context marker `[1m]` milik Claude Code ke `getProviderCredentials`.
+
+Parameter custom `keyRecord` (Allowed Model per API Key) digeser ke posisi ke-7, dan seluruh 5 call site internal disesuaikan (`apiKey, null, keyRecord` untuk jalur combo/adapter/fusion). Kedua mekanisme berjalan berdampingan tanpa konflik.
+
+---
+
+### 10. Live Catalog Zed di `ModelSelectModal.js` (upstream v0.5.95)
+
+Upstream v0.5.95 menambahkan live model fetcher untuk provider `zed` via `useLiveProviderModels`.
+
+Sama seperti integrasi Cline/ClinePass (lihat poin 5), hook `zedModels` diselaraskan agar menerima argumen `shouldFetchModalData`, sehingga badge counter `All N Models` di visual model picker tetap menghitung model live Zed secara akurat.
+
+---
+
+### 11. Filter `hidden` Provider di Usage Stats (upstream v0.5.95)
+
+Upstream v0.5.95 menambahkan filter `!p.hidden` pada daftar noAuth provider di `UsageStats.js` (exclude hidden providers dari usage stats).
+
+Digabungkan dengan filter custom `!disabledNoAuth.has(p.id)` (fitur Toggle Disable/Enable noAuth) — kedua kondisi kini aktif bersamaan.
+
+---
+
+### 12. Fix Codex refresh-token reuse pada auto-ping (upstream v0.5.95)
+
+Upstream v0.5.95 memperbaiki bug refresh-token reuse Codex (`0bc7f86e`) yang dapat mengeluarkan akun saat auto-ping.
+
+Fitur **Quota Auto-Ping** diuntungkan oleh fix ini: ping Codex (`gpt-5.5` tiny request) kini tidak lagi berisiko meng-invalidate sesi akun. Tidak ada perubahan kode custom yang diperlukan.
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
