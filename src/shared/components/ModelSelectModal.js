@@ -7,7 +7,6 @@ import ProviderIcon from "./ProviderIcon";
 import CapacityBadges from "./CapacityBadges";
 import { useModelCaps } from "@/shared/hooks/useModelCaps";
 import { getModelsByProviderId, getModelKind } from "@/shared/constants/models";
-import { isModelAllowed } from "@/lib/modelMatcher";
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, AI_PROVIDERS, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, getProviderAlias } from "@/shared/constants/providers";
 
 // Provider order: OAuth first, then Free Tier, then API Key (matches dashboard/providers)
@@ -32,13 +31,13 @@ const LIVE_CATALOG_PROVIDERS = ["cursor", "cline", "clinepass", "zed"];
 // same provider produce the same picker value (`alias/id`), so keeping the first
 // avoids duplicate rows. There is no per-connection metadata to preserve beyond
 // {id,name}. Empty array means "nothing live" so callers keep the static fallback.
-function useLiveProviderModels(shouldFetch, connectionIds, label) {
+function useLiveProviderModels(isOpen, connectionIds, label) {
   const [models, setModels] = useState([]);
   const idsKey = (connectionIds ?? []).join("|");
 
   useEffect(() => {
     const ids = idsKey ? idsKey.split("|") : [];
-    if (!shouldFetch || ids.length === 0) {
+    if (!isOpen || ids.length === 0) {
       setModels([]);
       return undefined;
     }
@@ -66,7 +65,7 @@ function useLiveProviderModels(shouldFetch, connectionIds, label) {
       });
 
     return () => { cancelled = true; };
-  }, [shouldFetch, idsKey, label]);
+  }, [isOpen, idsKey, label]);
 
   return models;
 }
@@ -76,20 +75,17 @@ export default function ModelSelectModal({
   onClose,
   onSelect,
   onDeselect,
-    selectedModel,
-    activeProviders = [],
-    allConnections = [],
+  selectedModel,
+  activeProviders = [],
   title = "Select Model",
   modelAliases = {},
   kindFilter = null,
   capFilter = null,
   addedModelValues = [],
   closeOnSelect = true,
-  allowedModelsFilter = [],
-  onModelsCalculated = null, // Callback to report the final calculated models back to parent
 }) {
-  const shouldFetchModalData = isOpen || Boolean(onModelsCalculated);
-  // Filter activeProviders by serviceKinds when kindFilter set (e.g. "webSearch", "webFetch")
+  // Filter activeProviders by serviceKinds when kindFilter set (e.g. "webSearch", "webFetch").
+  // Also hides explicitly-disabled providers (noAuth toggle stores SQLite 0).
   const filteredActiveProviders = useMemo(() => {
     const activeOnly = activeProviders.filter((p) => p.isActive !== false && p.isActive !== 0);
     if (!kindFilter) return activeOnly;
@@ -122,10 +118,10 @@ export default function ModelSelectModal({
   const clinepassConnectionIds = liveConnectionIdsByProvider.clinepass;
   const zedConnectionIds = liveConnectionIdsByProvider.zed;
 
-  const cursorModels = useLiveProviderModels(shouldFetchModalData, cursorConnectionIds, "Cursor");
-  const clineModels = useLiveProviderModels(shouldFetchModalData, clineConnectionIds, "Cline");
-  const clinepassModels = useLiveProviderModels(shouldFetchModalData, clinepassConnectionIds, "ClinePass");
-  const zedModels = useLiveProviderModels(shouldFetchModalData, zedConnectionIds, "Zed");
+  const cursorModels = useLiveProviderModels(isOpen, cursorConnectionIds, "Cursor");
+  const clineModels = useLiveProviderModels(isOpen, clineConnectionIds, "Cline");
+  const clinepassModels = useLiveProviderModels(isOpen, clinepassConnectionIds, "ClinePass");
+  const zedModels = useLiveProviderModels(isOpen, zedConnectionIds, "Zed");
 
   const fetchCombos = async () => {
     try {
@@ -140,8 +136,8 @@ export default function ModelSelectModal({
   };
 
   useEffect(() => {
-    if (shouldFetchModalData) fetchCombos();
-  }, [shouldFetchModalData]);
+    if (isOpen) fetchCombos();
+  }, [isOpen]);
 
   const fetchProviderNodes = async () => {
     try {
@@ -156,8 +152,8 @@ export default function ModelSelectModal({
   };
 
   useEffect(() => {
-    if (shouldFetchModalData) fetchProviderNodes();
-  }, [shouldFetchModalData]);
+    if (isOpen) fetchProviderNodes();
+  }, [isOpen]);
 
   const fetchCustomModels = async () => {
     try {
@@ -172,8 +168,8 @@ export default function ModelSelectModal({
   };
 
   useEffect(() => {
-    if (shouldFetchModalData) fetchCustomModels();
-  }, [shouldFetchModalData]);
+    if (isOpen) fetchCustomModels();
+  }, [isOpen]);
 
   const fetchDisabledModels = async () => {
     try {
@@ -188,26 +184,8 @@ export default function ModelSelectModal({
   };
 
   useEffect(() => {
-    if (shouldFetchModalData) fetchDisabledModels();
-  }, [shouldFetchModalData]);
-
-  const [fetchedConnections, setFetchedConnections] = useState([]);
-
-  const fetchConnections = async () => {
-    try {
-      const res = await fetch("/api/providers");
-      if (!res.ok) throw new Error(`Failed to fetch providers: ${res.status}`);
-      const data = await res.json();
-      setFetchedConnections(data.connections || []);
-    } catch (error) {
-      console.error("Error fetching connections in ModelSelectModal:", error);
-      setFetchedConnections([]);
-    }
-  };
-
-  useEffect(() => {
-    if (shouldFetchModalData) fetchConnections();
-  }, [shouldFetchModalData]);
+    if (isOpen) fetchDisabledModels();
+  }, [isOpen]);
 
   const allProviders = useMemo(() => ({ ...OAUTH_PROVIDERS, ...FREE_PROVIDERS, ...FREE_TIER_PROVIDERS, ...APIKEY_PROVIDERS }), []);
 
@@ -235,18 +213,10 @@ export default function ModelSelectModal({
     // Get all active provider IDs from connections (filtered by kindFilter if set)
     const activeConnectionIds = filteredActiveProviders.map(p => p.provider);
 
-      // Find disabled noAuth providers so we can exclude them
-      const connectionSource = allConnections.length > 0 ? allConnections : (fetchedConnections.length > 0 ? fetchedConnections : activeProviders);
-      const disabledNoAuthIds = new Set(
-        connectionSource
-          .filter(c => (c.isActive === false || c.isActive === 0) && NO_AUTH_PROVIDER_IDS.includes(c.provider))
-          .map(c => c.provider)
-      );
-
-      // No-auth providers: filter by kindFilter as well, and EXCLUDE disabled ones
-      const noAuthIds = (kindFilter
-        ? NO_AUTH_PROVIDER_IDS.filter((id) => (AI_PROVIDERS[id]?.serviceKinds || ["llm"]).includes(kindFilter))
-        : NO_AUTH_PROVIDER_IDS).filter(id => !disabledNoAuthIds.has(id));
+    // No-auth providers: filter by kindFilter as well
+    const noAuthIds = kindFilter
+      ? NO_AUTH_PROVIDER_IDS.filter((id) => (AI_PROVIDERS[id]?.serviceKinds || ["llm"]).includes(kindFilter))
+      : NO_AUTH_PROVIDER_IDS;
 
     // Compatible nodes (OpenAI/Anthropic Compatible) that already have user-added
     // custom models should be selectable even without an API-key connection. Local /
@@ -469,50 +439,15 @@ export default function ModelSelectModal({
     });
 
     return groups;
-  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, allConnections, fetchedConnections, cursorModels, clineModels, clinepassModels]);
+  }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, disabledModels, kindFilter, activeProviders, cursorModels, clineModels, clinepassModels]);
 
-  // Filter combos by search query and per-key model access. Combos are LLM-only
-  // and do not expose capability metadata, so hide them for kind/capability pickers.
+  // Filter combos by search query (and hide combos when kindFilter is set — combos are LLM-only by design)
   const filteredCombos = useMemo(() => {
     if (kindFilter || capFilter) return [];
-
-    let filtered = combos;
-    if (allowedModelsFilter.length > 0) {
-      filtered = filtered.filter((combo) =>
-        isModelAllowed(allowedModelsFilter, combo.name)
-      );
-    }
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((combo) =>
-        combo.name.toLowerCase().includes(query)
-      );
-    }
-    return filtered;
-  }, [combos, searchQuery, kindFilter, capFilter, allowedModelsFilter]);
-
-  // Report the unsearched, unrestricted catalog to the parent for accurate
-  // "allowed out of total" badges. Capability pickers intentionally omit combos.
-  useEffect(() => {
-    if (!onModelsCalculated) return;
-
-    const allBaseModelIds = [];
-    Object.values(groupedModels).forEach((group) => {
-      group.models.forEach((model) => {
-        if (!capFilter || getCaps(model.value)?.[capFilter] === true) {
-          allBaseModelIds.push(model.value);
-        }
-      });
-    });
-    if (!kindFilter && !capFilter) {
-      combos.forEach((combo) => allBaseModelIds.push(combo.name));
-    }
-
-    onModelsCalculated({
-      total: allBaseModelIds.length,
-      modelIds: allBaseModelIds,
-    });
-  }, [groupedModels, combos, kindFilter, capFilter, getCaps, onModelsCalculated]);
+    if (!searchQuery.trim()) return combos;
+    const query = searchQuery.toLowerCase();
+    return combos.filter(c => c.name.toLowerCase().includes(query));
+  }, [combos, searchQuery, kindFilter]);
 
   // Sort models alphabetically, with added models floated to top
   const sortModels = (models) => {
@@ -521,26 +456,18 @@ export default function ModelSelectModal({
     return [...added, ...rest];
   };
 
-  // Filter models by search query AND allowedModelsFilter
+  // Filter models by search query
   const filteredGroups = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
     const filtered = {};
     Object.entries(groupedModels).forEach(([providerId, group]) => {
       let models = group.models;
-
       // Filter by input-modality capability (vision/pdf/audioInput/videoInput).
       if (capFilter) {
         models = models.filter((m) => getCaps(m.value)?.[capFilter] === true);
         if (models.length === 0) return;
       }
-
-      // Filter by allowedModelsFilter
-      if (allowedModelsFilter.length > 0) {
-        models = models.filter((m) => isModelAllowed(allowedModelsFilter, m.value));
-        if (models.length === 0) return;
-      }
-
       if (query) {
         const providerNameMatches = group.name.toLowerCase().includes(query);
         models = models.filter(
@@ -550,17 +477,14 @@ export default function ModelSelectModal({
         );
         if (models.length === 0 && !providerNameMatches) return;
       }
-      
-      if (models.length > 0) {
-        filtered[providerId] = {
-          ...group,
-          models: sortModels(models),
-        };
-      }
+      filtered[providerId] = {
+        ...group,
+        models: sortModels(models),
+      };
     });
 
     return filtered;
-  }, [groupedModels, searchQuery, addedModelValues, allowedModelsFilter, capFilter, getCaps]);
+  }, [groupedModels, searchQuery, addedModelValues]);
 
   const handleSelect = (model) => {
     const value = model?.value || model?.name || model;
@@ -742,21 +666,11 @@ ModelSelectModal.propTypes = {
   activeProviders: PropTypes.arrayOf(
     PropTypes.shape({
       provider: PropTypes.string.isRequired,
-      isActive: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
-    })
-  ),
-  allConnections: PropTypes.arrayOf(
-    PropTypes.shape({
-      provider: PropTypes.string.isRequired,
-      isActive: PropTypes.oneOfType([PropTypes.bool, PropTypes.number]),
     })
   ),
   title: PropTypes.string,
   modelAliases: PropTypes.object,
   kindFilter: PropTypes.string,
-  capFilter: PropTypes.string,
   addedModelValues: PropTypes.arrayOf(PropTypes.string),
   closeOnSelect: PropTypes.bool,
-  allowedModelsFilter: PropTypes.arrayOf(PropTypes.string),
-  onModelsCalculated: PropTypes.func,
 };

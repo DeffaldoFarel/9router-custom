@@ -8,7 +8,6 @@ import { rememberEndpoint } from "./cliEndpointPresets";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
 import { getModelsByProviderId, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 export default function GenericCliToolCard({
   tool,
@@ -47,21 +46,6 @@ export default function GenericCliToolCard({
   const [showManualConfigModal, setShowManualConfigModal] = useState(false);
   const [customBaseUrl, setCustomBaseUrl] = useState("");
 
-  const selectedKeyObj = apiKeys?.find((k) => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-    if (selectedModels.length > 0) {
-      const invalidModels = selectedModels.filter((m) => !isModelAllowed(allowedModelsFilter, m));
-      if (invalidModels.length > 0) {
-        setSelectedModels((prev) => prev.filter((m) => isModelAllowed(allowedModelsFilter, m)));
-      }
-    }
-  }, [allowedModelsFilter, selectedModel, selectedModels]);
 
   const endpointUrl = `/api/cli-tools/${tool.id}-settings`;
 
@@ -640,7 +624,6 @@ export default function GenericCliToolCard({
         onClose={() => setModalOpen(false)}
         onSelect={handleSelectModel}
         activeProviders={activeProviders}
-        allowedModelsFilter={allowedModelsFilter}
       />
 
       <ManualConfigModal

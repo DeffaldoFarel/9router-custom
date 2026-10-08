@@ -7,7 +7,6 @@ import BaseUrlSelect from "./BaseUrlSelect";
 import { rememberEndpoint, readPresets } from "./cliEndpointPresets";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 import { CLI_TOOLS } from "@/shared/constants/cliTools";
 
 const ENDPOINT = "/api/cli-tools/hermes-settings";
@@ -192,16 +191,6 @@ export default function HermesToolCard({
 
   const profileLabel = (name) => (name === "default" ? "default profile" : `profile "${name}"`);
 
-  // Custom (Option A): Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-  }, [allowedModelsFilter, selectedModel]);
 
   const handleApply = async () => {
     setApplying(true);
@@ -595,7 +584,6 @@ export default function HermesToolCard({
           activeProviders={activeProviders}
           modelAliases={modelAliases}
           title={`Select Model for Hermes Agent${modalTarget !== "default" ? ` — ${HERMES_ROLES.find((r) => r.id === modalTarget)?.label || modalTarget}` : ""}`}
-          allowedModelsFilter={allowedModelsFilter}
         />
       )}
 

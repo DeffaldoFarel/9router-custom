@@ -7,7 +7,6 @@ import BaseUrlSelect from "./BaseUrlSelect";
 import { rememberEndpoint } from "./cliEndpointPresets";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 export default function OpenClawToolCard({
   tool,
@@ -131,31 +130,6 @@ export default function OpenClawToolCard({
   };
 
   
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    
-    // Reset single model
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-
-    // Reset agent models
-    if (Object.keys(agentModels).length > 0) {
-      const newAgentModels = { ...agentModels };
-      let changed = false;
-      for (const [key, val] of Object.entries(newAgentModels)) {
-        if (val && !isModelAllowed(allowedModelsFilter, val)) {
-          delete newAgentModels[key];
-          changed = true;
-        }
-      }
-      if (changed) setAgentModels(newAgentModels);
-    }
-  }, [allowedModelsFilter, selectedModel, agentModels]);
 
   const handleApplySettings = async () => {
     setApplying(true);
@@ -407,7 +381,6 @@ export default function OpenClawToolCard({
           activeProviders={activeProviders}
           modelAliases={modelAliases}
           title="Select Model for Open Claw"
-        allowedModelsFilter={allowedModelsFilter}
         />
       )}
 

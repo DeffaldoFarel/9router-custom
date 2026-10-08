@@ -7,7 +7,6 @@ import BaseUrlSelect from "./BaseUrlSelect";
 import { rememberEndpoint } from "./cliEndpointPresets";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 const CLOUD_URL = process.env.NEXT_PUBLIC_CLOUD_URL;
 
@@ -139,16 +138,6 @@ export default function DroidToolCard({
   };
 
   
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-  }, [allowedModelsFilter, selectedModel]);
 
   const handleApplySettings = async () => {
     setApplying(true);
@@ -420,7 +409,6 @@ export default function DroidToolCard({
           activeProviders={activeProviders}
           modelAliases={modelAliases}
           title="Select Model for Factory Droid"
-        allowedModelsFilter={allowedModelsFilter}
         />
       )}
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
-import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal, ApiKeyModelAccessModal, ModelSelectModal } from "@/shared/components";
+import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal, ModelSelectModal } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import {
   TUNNEL_BENEFITS,
@@ -18,20 +18,15 @@ import EndpointRow from "./components/EndpointRow";
 import StatusAlert from "./components/StatusAlert";
 import Tooltip from "./components/Tooltip";
 import SecurityWarning from "./components/SecurityWarning";
-import { isModelAllowed } from "@/lib/modelMatcher";
 import KeyAccessControls from "./components/KeyAccessControls";
 export default function APIPageClient({ machineId }) {
   const [keys, setKeys] = useState([]);
-  const [exactAvailableModels, setExactAvailableModels] = useState({ total: 0, modelIds: [] });
   const [activeProviders, setActiveProviders] = useState([]);
-  const [allConnections, setAllConnections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [createdKey, setCreatedKey] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
-  const [showAllowedModelModal, setShowAllowedModelModal] = useState(false);
-  const [selectedKeyForModels, setSelectedKeyForModels] = useState(null);
 
   const [requireApiKey, setRequireApiKey] = useState(false);
   const [requireLogin, setRequireLogin] = useState(true);
@@ -727,30 +722,6 @@ export default function APIPageClient({ machineId }) {
     return fullKey.slice(0, 6) + "•".repeat(fullKey.length - 10) + fullKey.slice(-4);
   };
 
-  const getAllowedModelsLabel = (key) => {
-    const total = exactAvailableModels.total;
-    const labelTotal = `${total} Model${total === 1 ? "" : "s"}`;
-    const allowed = Array.isArray(key.allowedModels) ? key.allowedModels : [];
-    if (allowed.length === 0 || allowed.includes("*")) return `All ${labelTotal}`;
-    const count = exactAvailableModels.modelIds.filter((modelId) => isModelAllowed(allowed, modelId)).length;
-    if (total > 0 && count === total) return `All ${labelTotal}`;
-    return `${count} of ${labelTotal}`;
-  };
-
-  const handleModelsCalculated = useCallback((data) => {
-    setExactAvailableModels((prev) => {
-      const nextModelIds = data.modelIds || [];
-      const prevModelIds = prev.modelIds || [];
-      if (
-        prev.total === data.total &&
-        prevModelIds.length === nextModelIds.length &&
-        prevModelIds.every((id, index) => id === nextModelIds[index])
-      ) {
-        return prev;
-      }
-      return { total: data.total || 0, modelIds: nextModelIds };
-    });
-  }, []);
 
   const toggleKeyVisibility = (keyId) => {
     setVisibleKeys(prev => {
@@ -1185,9 +1156,6 @@ export default function APIPageClient({ machineId }) {
                   />
                 </div>
                 <div className="flex items-center gap-2 shrink-0 pt-0.5">
-                  <span className="inline-flex items-center whitespace-nowrap rounded-full border border-primary/20 bg-primary/5 px-2 py-1 text-[11px] font-medium text-primary" title="Allowed models for this API key">
-                    {getAllowedModelsLabel(key)}
-                  </span>
                   <Toggle
                     size="sm"
                     checked={key.isActive ?? true}
@@ -1207,13 +1175,6 @@ export default function APIPageClient({ machineId }) {
                     }}
                     title={key.isActive ? "Pause key" : "Resume key"}
                   />
-                    <button
-                      onClick={() => { setSelectedKeyForModels(key); setShowAllowedModelModal(true); }}
-                      className="p-2 hover:bg-primary/10 rounded text-primary opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
-                      title="Manage allowed models"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">lock</span>
-                    </button>
                     <button
                       onClick={() => handleDeleteKey(key.id)}
                       className="p-2 hover:bg-red-500/10 rounded text-red-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all"
@@ -1554,43 +1515,6 @@ export default function APIPageClient({ machineId }) {
         </div>
       </Modal>
 
-      {/* Allowed Model Modal */}
-      <ApiKeyModelAccessModal
-        isOpen={showAllowedModelModal}
-        keyName={selectedKeyForModels?.name || ""}
-        currentAllowedModels={selectedKeyForModels?.allowedModels || []}
-        onClose={() => { setShowAllowedModelModal(false); setSelectedKeyForModels(null); }}
-        onSave={async (patterns) => {
-          if (!selectedKeyForModels) return;
-          try {
-            const saveRes = await fetch(`/api/keys/${selectedKeyForModels.id}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ allowedModels: patterns }),
-            });
-            
-            if (!saveRes.ok) {
-              console.error("Failed to save allowed models:", await saveRes.text());
-              return;
-            }
-
-            // Refresh keys list
-            const res = await fetch("/api/keys");
-            if (res.ok) {
-              const data = await res.json();
-              setKeys(data.keys || []);
-            }
-            
-            // Close the modal on success
-            setShowAllowedModelModal(false);
-            setSelectedKeyForModels(null);
-          } catch (err) {
-            console.error("Failed to save allowed models:", err);
-          }
-        }}
-        activeProviders={activeProviders}
-        allConnections={allConnections}
-      />
 
       <ModelSelectModal
         isOpen={showTestModelSelect}
@@ -1603,20 +1527,10 @@ export default function APIPageClient({ machineId }) {
         }}
         selectedModel={testModel}
         activeProviders={activeProviders}
-        allConnections={allConnections}
         title="Select Model for cURL Test"
         addedModelValues={testModel ? [testModel] : []}
-        allowedModelsFilter={selectedTestKey?.allowedModels || []}
       />
 
-      <ModelSelectModal
-        isOpen={false}
-        onClose={() => {}}
-        onSelect={() => {}}
-        activeProviders={activeProviders}
-        allConnections={allConnections}
-        onModelsCalculated={handleModelsCalculated}
-      />
 
       {/* Confirm Modal */}
       <ConfirmModal

@@ -5,12 +5,6 @@ import { KEY_ACCESS_UNRESTRICTED } from "@/shared/constants/keyAccess.js";
 
 function rowToKey(row) {
   if (!row) return null;
-  let allowedModels = [];
-  try {
-    allowedModels = row.allowedModels ? JSON.parse(row.allowedModels) : [];
-  } catch {
-    allowedModels = [];
-  }
   return {
     id: row.id,
     key: row.key,
@@ -18,7 +12,6 @@ function rowToKey(row) {
     machineId: row.machineId,
     isActive: row.isActive === 1 || row.isActive === true,
     createdAt: row.createdAt,
-    allowedModels,
     access: keyAccessFromColumns(row.accessRestricted, row.accessAllow),
   };
 }
@@ -43,12 +36,11 @@ export async function getApiKeyByKey(key) {
   return rowToKey(row);
 }
 
-export async function createApiKey(name, machineId, options = {}) {
+export async function createApiKey(name, machineId) {
   if (!machineId) throw new Error("machineId is required");
   const db = await getAdapter();
   const { generateApiKeyWithMachine } = await import("@/shared/utils/apiKey");
   const result = generateApiKeyWithMachine(machineId);
-  const allowedModels = options.allowedModels || [];
   const apiKey = {
     id: uuidv4(),
     name,
@@ -56,76 +48,30 @@ export async function createApiKey(name, machineId, options = {}) {
     machineId,
     isActive: true,
     createdAt: new Date().toISOString(),
-    allowedModels,
     access: { restricted: false, allow: [] },
   };
-  const accessCols = keyAccessToColumns(KEY_ACCESS_UNRESTRICTED);
-  try {
-    db.run(
-      `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt, allowedModels, accessRestricted, accessAllow) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt, JSON.stringify(allowedModels), accessCols.accessRestricted, accessCols.accessAllow]
-    );
-  } catch (e) {
-    // If a column doesn't exist yet (migration not applied), try to add it
-    if (e.message?.includes("no such column: allowedModels")) {
-      console.log("[DB][sync] +column apiKeys.allowedModels (lazy migration)");
-      try {
-        db.exec(`ALTER TABLE apiKeys ADD COLUMN allowedModels TEXT DEFAULT '[]'`);
-      } catch {
-        // Column might have been added by another request
-      }
-      // Retry the insert
-      db.run(
-        `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt, allowedModels, accessRestricted, accessAllow) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt, JSON.stringify(allowedModels), accessCols.accessRestricted, accessCols.accessAllow]
-      );
-    } else {
-      throw e;
-    }
-  }
+  const cols = keyAccessToColumns(KEY_ACCESS_UNRESTRICTED);
+  db.run(
+    `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt, accessRestricted, accessAllow) VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+    [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt, cols.accessRestricted, cols.accessAllow]
+  );
   return apiKey;
 }
 
 export async function updateApiKey(id, data) {
   const db = await getAdapter();
   let result = null;
-  let columnMissing = false;
   db.transaction(() => {
     const row = db.get(`SELECT * FROM apiKeys WHERE id = ?`, [id]);
     if (!row) return;
     const merged = { ...rowToKey(row), ...data };
-    const allowedModelsJson = merged.allowedModels !== undefined
-      ? JSON.stringify(merged.allowedModels)
-      : row.allowedModels;
     const cols = keyAccessToColumns(merged.access);
-    try {
-      db.run(
-        `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, allowedModels = ?, accessRestricted = ?, accessAllow = ? WHERE id = ?`,
-        [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, allowedModelsJson, cols.accessRestricted, cols.accessAllow, id]
-      );
-    } catch (e) {
-      // If column doesn't exist yet (migration not applied), try to add it
-      if (e.message?.includes("no such column: allowedModels")) {
-        columnMissing = true;
-        return; // Exit transaction, we'll add column outside
-      }
-      throw e;
-    }
+    db.run(
+      `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, accessRestricted = ?, accessAllow = ? WHERE id = ?`,
+      [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, cols.accessRestricted, cols.accessAllow, id]
+    );
     result = rowToKey(db.get(`SELECT * FROM apiKeys WHERE id = ?`, [id]));
   });
-
-  // If column was missing, add it and retry
-  if (columnMissing) {
-    console.log("[DB][sync] +column apiKeys.allowedModels (lazy migration)");
-    try {
-      db.exec(`ALTER TABLE apiKeys ADD COLUMN allowedModels TEXT DEFAULT '[]'`);
-    } catch {
-      // Column might have been added by another request
-    }
-    // Retry the update
-    return updateApiKey(id, data);
-  }
-
   return result;
 }
 
@@ -137,20 +83,7 @@ export async function deleteApiKey(id) {
 
 export async function validateApiKey(key) {
   const db = await getAdapter();
-  const row = db.get(`SELECT * FROM apiKeys WHERE key = ?`, [key]);
+  const row = db.get(`SELECT isActive FROM apiKeys WHERE key = ?`, [key]);
   if (!row) return false;
-  if (row.isActive !== 1 && row.isActive !== true) return false;
-  return rowToKey(row);
-}
-
-/**
- * Get full API key record by the actual key string (for model filtering).
- * Returns null if key doesn't exist or is inactive.
- */
-export async function getApiKeyByActualKey(key) {
-  const db = await getAdapter();
-  const row = db.get(`SELECT * FROM apiKeys WHERE key = ?`, [key]);
-  if (!row) return null;
-  if (row.isActive !== 1 && row.isActive !== true) return null;
-  return rowToKey(row);
+  return row.isActive === 1 || row.isActive === true;
 }

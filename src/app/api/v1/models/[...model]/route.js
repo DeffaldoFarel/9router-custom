@@ -1,6 +1,4 @@
 import { buildModelsList } from "../route.js";
-import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
-import { isModelAllowedBackend } from "@/sse/services/model";
 import { getKeyAccessContext, filterModelsListForKey } from "@/sse/services/keyAccess.js";
 
 // URL slug → service kind(s). `web` covers both webSearch and webFetch.
@@ -48,24 +46,8 @@ export async function GET(request, { params }) {
     const kindFilter = path.length === 1 ? KIND_SLUG_MAP[identifier] : null;
     const keyAccess = await getKeyAccessContext(request);
 
-    // Check API Key restrictions
-    const apiKey = extractApiKey(request);
-    let keyRecord = null;
-    if (apiKey) {
-      keyRecord = await isValidApiKey(apiKey, true);
-    }
-
     if (kindFilter) {
-      let data = await filterModelsListForKey(keyAccess, await buildModelsList(kindFilter));
-      if (keyRecord?.allowedModels?.length > 0) {
-        const filtered = [];
-        for (const m of data) {
-          if (await isModelAllowedBackend(keyRecord.allowedModels, m.id)) {
-            filtered.push(m);
-          }
-        }
-        data = filtered;
-      }
+      const data = await filterModelsListForKey(keyAccess, await buildModelsList(kindFilter));
       return json({ object: "list", data });
     }
 
@@ -74,11 +56,7 @@ export async function GET(request, { params }) {
     const models = await filterModelsListForKey(keyAccess, await buildModelsList([LLM_KIND]));
     const matchedModel = models.find((candidate) => candidate.id === identifier);
 
-    if (
-      !matchedModel ||
-      (keyRecord?.allowedModels?.length > 0 &&
-        !(await isModelAllowedBackend(keyRecord.allowedModels, matchedModel.id)))
-    ) {
+    if (!matchedModel) {
       return json(
         {
           error: {

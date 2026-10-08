@@ -277,7 +277,6 @@ export default function DefaultToolCard({ toolId, tool, isExpanded, onToggle, ba
           selectedModel={modelValue}
           activeProviders={activeProviders}
           title="Select Model"
-        allowedModelsFilter={allowedModelsFilter}
         />
       )}
     </Card>

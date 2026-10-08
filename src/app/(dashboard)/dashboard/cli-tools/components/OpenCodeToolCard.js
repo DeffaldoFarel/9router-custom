@@ -7,7 +7,6 @@ import BaseUrlSelect from "./BaseUrlSelect";
 import { rememberEndpoint } from "./cliEndpointPresets";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, apiKeys, activeProviders, cloudEnabled, initialStatus, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl }) {
   const [status, setStatus] = useState(initialStatus || null);
@@ -129,35 +128,6 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
   };
 
   
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    
-    // Reset single model
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-
-    // Reset array of selected models
-    if (selectedModels.length > 0) {
-      const invalidModels = selectedModels.filter(m => !isModelAllowed(allowedModelsFilter, m));
-      if (invalidModels.length > 0) {
-        setSelectedModels([]); // Clear all if any become invalid, or just filter them out? 
-        // User asked to "kosongkan" (empty) the selected models.
-        // So we clear them all or just the invalid ones? 
-        // "kosongkan Models yang diselect" implies clearing the selection.
-        // Let's just clear the whole list to be safe and consistent.
-      }
-    }
-
-    // Reset active model
-    if (activeModel && !isModelAllowed(allowedModelsFilter, activeModel)) {
-      setActiveModel("");
-    }
-  }, [allowedModelsFilter, selectedModel, selectedModels, activeModel]);
 
   const handleApply = async () => {
     setApplying(true);
@@ -509,7 +479,6 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
           addedModelValues={selectedModels}
           closeOnSelect={false}
           title="Add Model for OpenCode"
-        allowedModelsFilter={allowedModelsFilter}
         />
       )}
 
@@ -522,7 +491,6 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
           activeProviders={activeProviders}
           modelAliases={modelAliases}
           title="Select Subagent Model for OpenCode"
-        allowedModelsFilter={allowedModelsFilter}
         />
       )}
 

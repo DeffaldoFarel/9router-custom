@@ -21,8 +21,6 @@ import { resolveZedModels } from "open-sse/shared/zedAuth.js";
 import { updateProviderCredentials } from "@/sse/services/tokenRefresh";
 import { resolveConnectionProxyConfig } from "@/lib/network/connectionProxy";
 import { capabilitiesFromServiceKind, getCapabilitiesForModel, aggregateComboCapabilities } from "open-sse/providers/capabilities.js";
-import { extractApiKey, isValidApiKey } from "@/sse/services/auth";
-import { isModelAllowedBackend } from "@/sse/services/model";
 
 // Qoder shares one live resolver across intl (qoder) and CN (qoder-cn); the
 // credentials carry the provider id so qoderModels picks the right region's
@@ -682,27 +680,10 @@ export async function GET(request) {
   try {
     // Detect cross-instance recursive /models fetch (another 9router fetching our /models)
     const skipDynamicFetch = request?.headers?.get(INTERNAL_MODELS_FETCH_HEADER) === "1";
-    // Upstream key-access filter (restricted keys see only their allow list), then
-    // the custom allowedModels pattern filter for the authenticated key.
-    let data = await filterModelsListForKey(
+    const data = await filterModelsListForKey(
       await getKeyAccessContext(request),
       await buildModelsList([LLM_KIND], { skipDynamicFetch })
     );
-
-    // Filter the public model catalog using the authenticated API key.
-    const apiKey = extractApiKey(request);
-    if (apiKey) {
-      const keyRecord = await isValidApiKey(apiKey, true);
-      if (keyRecord?.allowedModels?.length > 0) {
-        const filtered = [];
-        for (const modelEntry of data) {
-          if (await isModelAllowedBackend(keyRecord.allowedModels, modelEntry.id)) {
-            filtered.push(modelEntry);
-          }
-        }
-        data = filtered;
-      }
-    }
     return Response.json({ object: "list", data }, {
       headers: { "Access-Control-Allow-Origin": "*" },
     });

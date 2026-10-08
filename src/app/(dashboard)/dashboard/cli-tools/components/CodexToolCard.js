@@ -7,7 +7,6 @@ import ProviderIcon from "@/shared/components/ProviderIcon";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 import { rememberEndpoint } from "./cliEndpointPresets";
 import { getCurrentCodexProviderSettings, deriveProfileNameFromModel } from "./codexConfig";
 
@@ -191,18 +190,6 @@ export default function CodexToolCard({ tool, isExpanded, onToggle, baseUrl, api
     }
   };
 
-  // Option A: Strict reset of selectedModel if it is disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-      setSubagentModel("");
-    }
-  }, [allowedModelsFilter, selectedModel]);
 
   const handleApplySettings = async () => {
     setApplying(true);
@@ -627,7 +614,6 @@ default_subagent_model = "${effectiveSubagentModel}"
           activeProviders={activeProviders}
           modelAliases={modelAliases}
           title="Select Model for Codex"
-        allowedModelsFilter={allowedModelsFilter}
         />
       )}
 
@@ -640,7 +626,6 @@ default_subagent_model = "${effectiveSubagentModel}"
           activeProviders={activeProviders}
           modelAliases={modelAliases}
           title="Select Subagent Model for Codex"
-        allowedModelsFilter={allowedModelsFilter}
         />
       )}
 
@@ -653,7 +638,6 @@ default_subagent_model = "${effectiveSubagentModel}"
           activeProviders={activeProviders}
           modelAliases={modelAliases}
           title="Select Model for Codex CLI"
-          allowedModelsFilter={allowedModelsFilter}
         />
       )}
 

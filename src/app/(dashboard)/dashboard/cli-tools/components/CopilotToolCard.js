@@ -7,7 +7,6 @@ import BaseUrlSelect from "./BaseUrlSelect";
 import { rememberEndpoint } from "./cliEndpointPresets";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 export default function CopilotToolCard({ tool, isExpanded, onToggle, baseUrl, apiKeys, activeProviders, cloudEnabled, initialStatus, tunnelEnabled, tunnelPublicUrl, tailscaleEnabled, tailscaleUrl }) {
   const [status, setStatus] = useState(initialStatus || null);
@@ -113,26 +112,6 @@ export default function CopilotToolCard({ tool, isExpanded, onToggle, baseUrl, a
   };
 
   
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    
-    // Reset single model
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-
-    // Reset array of selected models
-    if (selectedModels.length > 0) {
-      const invalidModels = selectedModels.filter(m => !isModelAllowed(allowedModelsFilter, m));
-      if (invalidModels.length > 0) {
-        setSelectedModels([]);
-      }
-    }
-  }, [allowedModelsFilter, selectedModel, selectedModels]);
 
   const handleApply = async () => {
     setApplying(true);
@@ -343,7 +322,6 @@ export default function CopilotToolCard({ tool, isExpanded, onToggle, baseUrl, a
           addedModelValues={selectedModels}
           closeOnSelect={false}
           title="Add Model for GitHub Copilot"
-        allowedModelsFilter={allowedModelsFilter}
         />
       )}
 

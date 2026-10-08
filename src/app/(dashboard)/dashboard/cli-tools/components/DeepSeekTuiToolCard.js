@@ -7,7 +7,6 @@ import BaseUrlSelect from "./BaseUrlSelect";
 import { rememberEndpoint } from "./cliEndpointPresets";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
-import { isModelAllowed } from "@/lib/modelMatcher";
 
 const ENDPOINT = "/api/cli-tools/deepseek-tui-settings";
 
@@ -114,16 +113,6 @@ export default function DeepSeekTuiToolCard({
   };
 
   
-  // Option A: Strict reset of models if disallowed by the selected API Key
-  const selectedKeyObj = apiKeys?.find(k => k.key === selectedApiKey);
-  const allowedModelsFilter = selectedKeyObj?.allowedModels || [];
-
-  useEffect(() => {
-    if (allowedModelsFilter.length === 0) return;
-    if (selectedModel && !isModelAllowed(allowedModelsFilter, selectedModel)) {
-      setSelectedModel("");
-    }
-  }, [allowedModelsFilter, selectedModel]);
 
   const handleApply = async () => {
     setApplying(true);
@@ -342,7 +331,6 @@ model = "${selectedModel || "provider/model-id"}"
           activeProviders={activeProviders}
           modelAliases={modelAliases}
           title="Select Model for DeepSeek TUI"
-        allowedModelsFilter={allowedModelsFilter}
         />
       )}
 

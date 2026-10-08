@@ -22,7 +22,7 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { isActive, allowedModels, access } = body;
+    const { isActive, access } = body;
 
     const existing = await getApiKeyById(id);
     if (!existing) {
@@ -31,12 +31,6 @@ export async function PUT(request, { params }) {
 
     const updateData = {};
     if (isActive !== undefined) updateData.isActive = isActive;
-    if (allowedModels !== undefined) {
-      if (!Array.isArray(allowedModels)) {
-        return NextResponse.json({ error: "allowedModels must be an array" }, { status: 400 });
-      }
-      updateData.allowedModels = allowedModels;
-    }
     if (access !== undefined) {
       const checked = validateKeyAccessInput(access);
       if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 });

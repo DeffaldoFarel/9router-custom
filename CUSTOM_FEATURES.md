@@ -8,72 +8,41 @@ Dokumentasi fitur custom, perbaikan (fixes), dan penyesuaian (adjustments) yang 
 
 ### 1. Allowed Model per API Key
 
-**Status:** ✅ Implemented
+**Status:** 🗑️ Removed (v0.5.99 migration) — digantikan oleh **upstream Per-Key Access Control**
 
-Setiap API Key dapat dikonfigurasi untuk membatasi model mana saja yang bisa diakses.
+Fitur ini sudah dihapus penuh dari codebase custom dan digantikan sistem resmi upstream yang setara (`d8c585fb`, ada sejak upstream v0.5.99): kolom `accessRestricted`/`accessAllow` di tabel `apiKeys`, UI **KeyAccessControls** di halaman Endpoint, dan gate `enforceKeyAccess` di seluruh handler `/v1/*` (chat, embeddings, STT, TTS, image, search, video, systemone).
 
-#### Fitur Detail
+#### Perbedaan Perilaku yang Perlu Diketahui
 
-| Fitur | Deskripsi |
-|-------|-----------|
-| **Pattern Matching** | Support wildcard: `*` (semua), `provider/*` (semua model dari provider), `provider/model` (model spesifik) |
-| **Visual Model Picker** | Modal dual-column dengan group per provider: kolom kiri **Allowed**, kolom kanan **Restricted**. Klik model untuk memindahkannya antar kolom. |
-| **Quick Provider Actions** | Tombol `Move all` pada setiap group provider untuk memindahkan seluruh model sekaligus. |
-| **Search** | Pencarian model berlaku pada kedua kolom. |
-| **Hybrid Save Format** | Jika seluruh model provider diizinkan, disimpan sebagai `provider/*`; jika sebagian, disimpan sebagai daftar model eksplisit. |
-| **Explicit Deny-All** | Jika semua model dipindahkan ke Restricted, disimpan sebagai sentinel internal `["__none__"]`; array kosong `[]` tetap berarti unrestricted demi backward compatibility. |
-| **Allowed Count Badge** | Menampilkan jumlah model yang diizinkan di setiap API Key, misalnya `All 100 Models` (jika unrestricted atau semua model diizinkan, misal 21 dari 21) atau `12 of 100 Models`. |
-| **Unavailable Pattern Marker** | Pattern lama tetap disimpan, tetapi diberi label seperti `Provider disabled`, `Provider unavailable`, atau `Model unavailable`. |
-| **404 Response** | Jika model tidak diizinkan, return 404 "Model not found" (bukan 403 "Not allowed") |
-| **Models Endpoint Filter** | `GET /v1/models` hanya return model yang diizinkan untuk API Key tersebut |
-| **Combo Filtering** | Combo models juga difilter berdasarkan allowed models |
+| Aspek | Custom lama (dihapus) | Upstream (aktif) |
+|-------|----------------------|------------------|
+| Pattern | Wildcard `*`, `provider/*`, `__none__` | Exact list combo/model saja |
+| Key unrestricted | `allowedModels: []` | `restricted: false` |
+| Response ditolak | 404 "Model not found" | 403 "not allowed to use model" |
+| Model baru dari provider | Otomatis tercakup oleh `provider/*` | Harus ditambahkan manual ke allow list |
 
-#### Contoh Penggunaan
+#### Migrasi Data Key `Fandy`
 
-```bash
-POST /api/keys
-{
-  "name": "Client A - Only GLM",
-  "allowedModels": ["glm/*", "minimax/*"]
-}
+Pattern lama `["ag/*","kr/*","inf/*"]` dikonversi menjadi exact allow list di `access.allow` (restricted = true). Isi konkritnya diambil dari `/v1/models` pada saat migrasi. Key lain yang `allowedModels`-nya kosong tidak perlu tindakan apa pun — keduanya unrestricted secara default.
 
-GET /v1/models
-Authorization: Bearer sk-xxxxx
-# → Hanya model yang cocok dengan allowedModels yang muncul
-```
+Kolom `allowedModels` tetap ada di database (tidak dihapus) sebagai arsip historis dan tidak lagi dibaca oleh kode.
 
-#### Pattern Support
+#### File yang Dikembalikan ke Upstream
 
-| Pattern | Contoh | Deskripsi |
-|---------|--------|-----------|
-| `*` | `*` | Semua model |
-| `provider/*` | `anthropic/*` | Semua model dari provider |
-| `provider/model` | `glm/glm-4.7` | Model spesifik |
-| `__none__` | `["__none__"]` | Tidak ada model yang diizinkan |
-| `[]` (kosong) | `[]` | Unrestricted (default/backward-compatible) |
+- `src/sse/handlers/chat.js`, `src/sse/services/model.js`
+- `src/app/api/v1/models/route.js`, `src/app/api/v1/models/[...model]/route.js`, `src/app/api/v1beta/models/route.js`
+- `src/app/api/keys/route.js`, `src/app/api/keys/[id]/route.js`
+- `src/lib/db/repos/apiKeysRepo.js`, `src/lib/db/schema.js`
+- `src/shared/components/ModelSelectModal.js`, `src/shared/components/index.js`
 
-#### File yang Dimodifikasi
+#### File yang Dihapus
 
-| File | Perubahan |
-|------|-----------|
-| `src/lib/db/migrations/002-add-allowed-models.js` | Migration baru |
-| `src/lib/db/schema.js` | Kolom `allowedModels` di tabel `apiKeys` |
-| `src/lib/db/repos/apiKeysRepo.js` | CRUD `allowedModels`, lazy migration fallback |
-| `src/lib/modelMatcher.js` | Pattern matching utility dan explicit deny-all sentinel |
-| `src/sse/services/model.js` | Backend model restriction matching helper |
-| `src/sse/handlers/chat.js` | Model access check (return 404) |
-| `src/app/api/v1/models/route.js` | Filter models by API key |
-| `src/app/api/v1/models/[kind]/route.js` | Filter models by API key |
-| `src/app/api/v1beta/models/route.js` | Filter Gemini models by API key |
-| `src/app/api/keys/route.js` | Accept `allowedModels` di POST |
-| `src/app/api/keys/[id]/route.js` | Accept `allowedModels` di PUT |
-| `src/shared/components/ApiKeyModelAccessModal.js` | Modal wrapper dual-column |
-| `src/shared/components/DualColumnModelPicker.js` | Dual-column picker dan hybrid pattern serializer |
-| `src/shared/hooks/useModelGrouping.js` | Reusable model grouping/fetching hook |
-| `src/shared/components/ModelSelectModal.js` | Model grouping dan filtering kompatibilitas |
+- `src/lib/modelMatcher.js`, `src/shared/components/DualColumnModelPicker.js`, `src/shared/components/ApiKeyModelAccessModal.js`
+- `src/shared/hooks/useModelGrouping.js`, `src/lib/db/migrations/002-add-allowed-models.js`
+- `src/app/api/models/available/route.js`
+- `tests/unit/allowed-models-backend.test.js`, `tests/unit/chat-allowed-models-capacity.test.js`
 
----
-
+Catatan: filter `allowedModelsFilter` di seluruh ToolCard dashboard (Claude, Codex, Hermes, Cowork, dll.) juga dihapus — seleksi model di dashboard kini sepenuhnya mengikuti perilaku upstream.
 ### 2. Test All Models (Sequential Provider Model Testing)
 
 **Status:** ✅ Implemented
@@ -272,19 +241,17 @@ Fitur **Quota Auto-Ping** diuntungkan oleh fix ini: ping Codex (`gpt-5.5` tiny r
 
 ---
 
-### 13. Upstream Per-Key Access Control — koeksistensi dengan Allowed Models (upstream v0.5.99)
+### 13. Upstream Per-Key Access Control menggantikan Allowed Models custom (upstream v0.5.99)
 
 Upstream v0.5.99 (`d8c585fb`) menambahkan **per-API-key access control** via kolom `accessRestricted`/`accessAllow` (schema v2): key restricted hanya boleh memanggil combo/model yang terdaftar (exact match, resolved identity, deny-by-default).
 
-Fitur ini **paralel** dengan Allowed Model per API Key custom (pattern/wildcard, deny-all sentinel). Strategi integrasi: **kedua sistem aktif bersamaan (intersection)** — request harus lolos keduanya:
+Awalnya Kiti jalankan paralel (intersection, request harus lolos kedua gate). Sejak migrasi v0.5.99, **sistem custom dihapus penuh** dan upstream access control menjadi satu-satunya mekanisme per-key restriction (lihat poin 1):
 
-| Titik | Urutan gate |
+| Titik gate | Implementasi upstream |
 |-------|-------------|
-| `handleChat` / `handleSingleModelChat` | `enforceKeyAccess` (upstream, 403) → `isAllowedForKey` (custom, 404) |
-| Combo + adapter models | `filterAdapterModels` (upstream) → `authorizeAugmentedModels` (custom) |
-| Fusion judge | upstream gate di combo → `getAuthorizedFusionJudge` (custom) |
-| `GET /v1/models` | `filterModelsListForKey` (upstream) → `isModelAllowedBackend` (custom) |
-| `GET /v1/models/{kind}` & catch-all | sama seperti di atas, dua lapis |
+| chat & semua handler `/v1/*` | `enforceKeyAccess` / `enforceKeyAccessResolved` / `enforceKeyAccessProvider` |
+| Combo + adapter models | `filterAdapterModels` |
+| `GET /v1/models`, `/v1/models/{kind}` | `filterModelsListForKey` |
 
 `apiKeysRepo.js` menyimpan kedua kolom sekaligus (`allowedModels` tetap, plus `accessRestricted`/`accessAllow`); lazy migration `ALTER TABLE` dipertahankan. UI Endpoint page kini menampilkan `KeyAccessControls` upstream **dan** badge `All N Models` custom berdampingan. `POST/PUT /api/keys` menerima `allowedModels` maupun `access`.
 
