@@ -272,6 +272,35 @@ Fitur **Quota Auto-Ping** diuntungkan oleh fix ini: ping Codex (`gpt-5.5` tiny r
 
 ---
 
+### 13. Upstream Per-Key Access Control — koeksistensi dengan Allowed Models (upstream v0.5.99)
+
+Upstream v0.5.99 (`d8c585fb`) menambahkan **per-API-key access control** via kolom `accessRestricted`/`accessAllow` (schema v2): key restricted hanya boleh memanggil combo/model yang terdaftar (exact match, resolved identity, deny-by-default).
+
+Fitur ini **paralel** dengan Allowed Model per API Key custom (pattern/wildcard, deny-all sentinel). Strategi integrasi: **kedua sistem aktif bersamaan (intersection)** — request harus lolos keduanya:
+
+| Titik | Urutan gate |
+|-------|-------------|
+| `handleChat` / `handleSingleModelChat` | `enforceKeyAccess` (upstream, 403) → `isAllowedForKey` (custom, 404) |
+| Combo + adapter models | `filterAdapterModels` (upstream) → `authorizeAugmentedModels` (custom) |
+| Fusion judge | upstream gate di combo → `getAuthorizedFusionJudge` (custom) |
+| `GET /v1/models` | `filterModelsListForKey` (upstream) → `isModelAllowedBackend` (custom) |
+| `GET /v1/models/{kind}` & catch-all | sama seperti di atas, dua lapis |
+
+`apiKeysRepo.js` menyimpan kedua kolom sekaligus (`allowedModels` tetap, plus `accessRestricted`/`accessAllow`); lazy migration `ALTER TABLE` dipertahankan. UI Endpoint page kini menampilkan `KeyAccessControls` upstream **dan** badge `All N Models` custom berdampingan. `POST/PUT /api/keys` menerima `allowedModels` maupun `access`.
+
+Key unrestricted di kedua sistem berperilaku sama seperti sebelumnya (backward compatible penuh).
+
+---
+
+### 14. Interaksi lainnya (upstream v0.5.99)
+
+* **Hermes per-profile config** (`a9c9f683`): tombol "Apply to All Profiles" upstream digabung dengan guard custom `hermesStatus.installed` dan reset `allowedModelsFilter` tetap aktif pada modal multi-role.
+* **AWS Bedrock** (`a9d0ad26`): validasi API key provider kini menerima `apiKeyOptionalWith` (substitusi `profile`); digabung dengan pengecualian custom noAuth (`!isFreeProvider && !hasApiKeySubstitute`).
+* **Ping internal model test** (`d8c585fb`): upstream memilih key unrestricted lebih dulu; kriteria custom "SQLite `0` = inactive" dipertahankan dalam filter yang sama.
+* **UI mobile layout** (`eea08215`): layout tombol `flex flex-wrap` upstream dipadukan dengan warna kuning "not installed" dan guard `installed` milik card Claude/Hermes.
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._

@@ -25,8 +25,11 @@ import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
 import { stripModelContextMarker } from "open-sse/utils/modelMarkers.js";
+import { getKeyAccessContext, enforceKeyAccess, filterAdapterModels } from "../services/keyAccess.js";
 import { isModelAllowed } from "@/lib/modelMatcher.js";
 
+// Custom feature: Allowed Models per API Key (pattern-based; see CUSTOM_FEATURES.md).
+// Runs alongside upstream key-access (exact allow list): a request must pass BOTH.
 async function isAllowedForKey(keyRecord, modelStr) {
   if (!keyRecord?.allowedModels?.length) return true;
   if (isModelAllowed(keyRecord.allowedModels, modelStr)) return true;
@@ -120,6 +123,13 @@ export async function handleChat(request, clientRawRequest = null) {
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model");
   }
 
+  // Per-key access control: a restricted key may call only its listed combos and
+  // models. Checked once on the requested target, before bypass, combo expansion
+  // and any credential lookup; an allowed combo grants the members it routes to.
+  const keyAccess = await getKeyAccessContext(request);
+  const keyAccessDenied = await enforceKeyAccess(keyAccess, modelStr);
+  if (keyAccessDenied) return keyAccessDenied;
+
   // Check if model is a combo (has multiple models with fallback)
   const comboModels = await getComboModels(modelStr);
   if (comboModels) {
@@ -146,8 +156,11 @@ export async function handleChat(request, clientRawRequest = null) {
     const comboStrategies = settings.comboStrategies || {};
     const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
     const comboStrategy = comboSpecificStrategy || settings.comboStrategy || "fallback";
+    // Custom allowedModels gate runs on the filtered combo; upstream key-access
+    // adapter filter runs with the original combo as the always-kept base.
     const augmentedCandidates = augmentModelsWithCapacityAdapter(filteredCombo, requiredCapabilities, settings);
-    const augmentedModels = await authorizeAugmentedModels(keyRecord, filteredCombo, augmentedCandidates);
+    const keyAccessFiltered = await filterAdapterModels(keyAccess, augmentedCandidates, comboModels);
+    const augmentedModels = await authorizeAugmentedModels(keyRecord, filteredCombo, keyAccessFiltered);
     const adapterAdded = augmentedModels.filter((m) => !filteredCombo.includes(m));
 
     if (comboStrategy === "fusion") {
@@ -207,7 +220,8 @@ export async function handleChat(request, clientRawRequest = null) {
   // Single model request — may still switch to a capacity-adapter model if the
   // target lacks a capability the request needs (e.g. no vision, request has an image).
   const soloCandidates = augmentModelsWithCapacityAdapter([modelStr], requiredCapabilities, settings);
-  const soloAugmented = await authorizeAugmentedModels(keyRecord, [modelStr], soloCandidates);
+  const soloKeyAccessFiltered = await filterAdapterModels(keyAccess, soloCandidates, [modelStr]);
+  const soloAugmented = await authorizeAugmentedModels(keyRecord, [modelStr], soloKeyAccessFiltered);
   if (soloAugmented.length > 1) {
     const adapterAdded = soloAugmented.filter((m) => m !== modelStr);
     log.info("CHAT", `Capacity adapter for [${[...requiredCapabilities].join(",")}] on "${modelStr}" → trying ${soloAugmented.join(", ")}`);
@@ -249,8 +263,11 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
       const comboStrategy = comboSpecificStrategy || chatSettings.comboStrategy || "fallback";
       const requiredCapabilities = detectRequiredCapabilities(body);
-      const augmentedCandidates = augmentModelsWithCapacityAdapter(filteredCombo, requiredCapabilities, chatSettings);
-      const augmentedModels = await authorizeAugmentedModels(keyRecord, filteredCombo, augmentedCandidates);
+      // Nested combo: the outer target already passed both gates; re-filter the
+      // adapter candidates through both key-access (upstream) and allowedModels (custom).
+      const augmentedCandidates = augmentModelsWithCapacityAdapter(comboModels, requiredCapabilities, chatSettings);
+      const keyAccessFiltered = await filterAdapterModels(keyAccess, augmentedCandidates, comboModels);
+      const augmentedModels = await authorizeAugmentedModels(keyRecord, filteredCombo, keyAccessFiltered);
       const adapterAdded = augmentedModels.filter((m) => !filteredCombo.includes(m));
 
       if (comboStrategy === "fusion") {

@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { getAdapter } from "../driver.js";
+import { keyAccessFromColumns, keyAccessToColumns } from "@/shared/utils/keyAccess.js";
+import { KEY_ACCESS_UNRESTRICTED } from "@/shared/constants/keyAccess.js";
 
 function rowToKey(row) {
   if (!row) return null;
@@ -17,6 +19,7 @@ function rowToKey(row) {
     isActive: row.isActive === 1 || row.isActive === true,
     createdAt: row.createdAt,
     allowedModels,
+    access: keyAccessFromColumns(row.accessRestricted, row.accessAllow),
   };
 }
 
@@ -29,6 +32,14 @@ export async function getApiKeys() {
 export async function getApiKeyById(id) {
   const db = await getAdapter();
   const row = db.get(`SELECT * FROM apiKeys WHERE id = ?`, [id]);
+  return rowToKey(row);
+}
+
+// Used by the /v1 handlers to read the presented key's access settings.
+export async function getApiKeyByKey(key) {
+  if (!key) return null;
+  const db = await getAdapter();
+  const row = db.get(`SELECT * FROM apiKeys WHERE key = ?`, [key]);
   return rowToKey(row);
 }
 
@@ -46,14 +57,16 @@ export async function createApiKey(name, machineId, options = {}) {
     isActive: true,
     createdAt: new Date().toISOString(),
     allowedModels,
+    access: { restricted: false, allow: [] },
   };
+  const accessCols = keyAccessToColumns(KEY_ACCESS_UNRESTRICTED);
   try {
     db.run(
-      `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt, allowedModels) VALUES(?, ?, ?, ?, ?, ?, ?)`,
-      [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt, JSON.stringify(allowedModels)]
+      `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt, allowedModels, accessRestricted, accessAllow) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt, JSON.stringify(allowedModels), accessCols.accessRestricted, accessCols.accessAllow]
     );
   } catch (e) {
-    // If column doesn't exist yet (migration not applied), try to add it
+    // If a column doesn't exist yet (migration not applied), try to add it
     if (e.message?.includes("no such column: allowedModels")) {
       console.log("[DB][sync] +column apiKeys.allowedModels (lazy migration)");
       try {
@@ -63,8 +76,8 @@ export async function createApiKey(name, machineId, options = {}) {
       }
       // Retry the insert
       db.run(
-        `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt, allowedModels) VALUES(?, ?, ?, ?, ?, ?, ?)`,
-        [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt, JSON.stringify(allowedModels)]
+        `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt, allowedModels, accessRestricted, accessAllow) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt, JSON.stringify(allowedModels), accessCols.accessRestricted, accessCols.accessAllow]
       );
     } else {
       throw e;
@@ -84,10 +97,11 @@ export async function updateApiKey(id, data) {
     const allowedModelsJson = merged.allowedModels !== undefined
       ? JSON.stringify(merged.allowedModels)
       : row.allowedModels;
+    const cols = keyAccessToColumns(merged.access);
     try {
       db.run(
-        `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, allowedModels = ? WHERE id = ?`,
-        [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, allowedModelsJson, id]
+        `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, allowedModels = ?, accessRestricted = ?, accessAllow = ? WHERE id = ?`,
+        [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, allowedModelsJson, cols.accessRestricted, cols.accessAllow, id]
       );
     } catch (e) {
       // If column doesn't exist yet (migration not applied), try to add it
@@ -97,7 +111,7 @@ export async function updateApiKey(id, data) {
       }
       throw e;
     }
-    result = merged;
+    result = rowToKey(db.get(`SELECT * FROM apiKeys WHERE id = ?`, [id]));
   });
 
   // If column was missing, add it and retry
