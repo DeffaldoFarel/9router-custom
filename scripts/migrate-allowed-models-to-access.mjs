@@ -3,65 +3,75 @@
  * One-time data migration: convert the custom `allowedModels` wildcard patterns
  * to the upstream per-key access control (`accessRestricted`/`accessAllow`).
  *
- * Run on the VPS AFTER the new build is deployed but BEFORE/whenever keys need
- * their restrictions carried over. Idempotent: keys already migrated are skipped.
+ * Reads the sqlite DB directly with better-sqlite3 (no "@/..." alias imports,
+ * so it runs under plain node on the VPS). Idempotent: already-migrated keys
+ * are skipped. Run AFTER the new build is serving on PORT.
  *
- * Usage:  node scripts/migrate-allowed-models-to-access.mjs
+ * Usage:  node scripts/migrate-allowed-models-to-access.mjs [port]
  */
-import { getAdapter, closeAdapter } from "../src/lib/db/driver.js";
+import { createRequire } from "node:module";
+import path from "node:path";
+import os from "node:os";
+import fs from "node:fs";
 
-const DEFAULT_ALLOW = {
-  // Pattern -> concrete allow list, captured from /v1/models at migration time.
-  // Extend here if new restricted keys appear later.
-};
+const require = createRequire(import.meta.url);
+const Database = require("better-sqlite3");
 
-async function resolvePattern(pattern) {
-  if (pattern === "__none__") return [];
-  if (pattern === "*" || pattern.endsWith("/*")) {
-    const provider = pattern === "*" ? null : pattern.slice(0, -2);
-    const res = await fetch("http://127.0.0.1:20128/v1/models", {
-      headers: { "x-internal-migration": "1" },
-    }).catch(() => null);
-    if (!res?.ok) return null;
+const PORT = process.argv[2] || process.env.PORT || 20128;
+const dbPath = process.env.NINEROUTER_DB
+  || path.join(os.homedir(), ".9router", "db", "data.sqlite");
+
+if (!fs.existsSync(dbPath)) {
+  console.error(`DB not found at ${dbPath} (override with NINEROUTER_DB=...)`);
+  process.exit(1);
+}
+
+async function fetchModels(port) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/v1/models`);
+    if (!res.ok) return null;
     const json = await res.json();
-    return (json.data || [])
-      .map((m) => m.id)
-      .filter((id) => (provider ? id.startsWith(`${provider}/`) : true));
+    return (json.data || []).map((m) => m.id);
+  } catch { return null; }
+}
+
+function resolvePatternLocal(pattern, modelIds) {
+  if (pattern === "__none__") return [];
+  if (pattern === "*") return modelIds;
+  if (pattern.endsWith("/*")) {
+    const provider = pattern.slice(0, -2);
+    return modelIds.filter((id) => id.startsWith(`${provider}/`));
   }
   return [pattern];
 }
 
-const db = await getAdapter();
-const rows = db.all(`SELECT id, name, allowedModels, accessRestricted, accessAllow FROM apiKeys`);
+const db = new Database(dbPath);
+db.pragma("journal_mode = WAL");
+const rows = db.prepare(`SELECT id, name, allowedModels, accessRestricted FROM apiKeys`).all();
+const allIds = ((await fetchModels(PORT)) || []).map(String);
+
 let migrated = 0, skipped = 0, empty = 0, failed = 0;
+const upd = db.prepare(`UPDATE apiKeys SET accessRestricted = 1, accessAllow = ? WHERE id = ?`);
 
 for (const row of rows) {
   let patterns = [];
   try { patterns = row.allowedModels ? JSON.parse(row.allowedModels) : []; } catch { patterns = []; }
   if (!Array.isArray(patterns) || patterns.length === 0 || patterns.includes("*")) { empty++; continue; }
-  if (row.accessRestricted === 1) { skipped++; continue; } // already migrated / user-managed
+  if (row.accessRestricted === 1) { skipped++; continue; }
 
-  const allow = new Set();
-  let unresolved = false;
-  for (const p of patterns) {
-    const concrete = DEFAULT_ALLOW[p] ?? (await resolvePattern(p));
-    if (concrete === null) { unresolved = true; break; }
-    concrete.forEach((id) => allow.add(id));
-  }
-  if (unresolved) {
-    console.warn(`[migrate] key "${row.name}" (${row.id}): /v1/models unreachable, skipping — migrate manually`);
+  if (!allIds.length) {
+    console.warn(`[migrate] key "${row.name}": /v1/models unreachable on :${PORT} — not touching this key`);
     failed++;
     continue;
   }
 
-  const allowJson = JSON.stringify([...allow]);
-  db.run(
-    `UPDATE apiKeys SET accessRestricted = 1, accessAllow = ? WHERE id = ?`,
-    [allowJson, row.id]
-  );
+  const allow = new Set();
+  for (const p of patterns) resolvePatternLocal(p, allIds).forEach((id) => allow.add(id));
+
+  upd.run(JSON.stringify([...allow].sort()), row.id);
   console.log(`[migrate] key "${row.name}" (${row.id}): ${patterns.join(", ")} -> ${allow.size} exact entries`);
   migrated++;
 }
 
+db.close();
 console.log(`done. migrated=${migrated} skipped(already-restricted)=${skipped} unrestricted=${empty} failed=${failed}`);
-await closeAdapter();
