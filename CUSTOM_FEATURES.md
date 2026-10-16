@@ -268,6 +268,30 @@ Key unrestricted di kedua sistem berperilaku sama seperti sebelumnya (backward c
 
 ---
 
+### 15. Auto-Ping Anchored Schedule + Antigravity (upstream v0.5.104)
+
+Upstream v0.5.104 menambahkan **anchored auto-ping schedule** (`be51142b`, `28d40159`): ping di jam tetap per hari berbasis timezone lokal, dengan modul baru `quotaPingSchedule.js` (`getDuePingSlot`, `normalizePingSchedule`), state `schedules` per-connection di settings, dan modal UI `AutoPingScheduleModal`.
+
+Integrasi dengan fitur **Quota Auto-Ping Antigravity** custom:
+- `quotaAutoPing.js` menggabungkan slot scheduling upstream dengan handler `antigravity` custom (alternating Gemini/Claude); log ping kini format `slot <key>, model <model>`.
+- `initializeApp.js`: opt-in check sekarang mencakup `schedules.enabled` (upstream) DAN `antigravityAutoPing` (custom).
+- `ProviderLimits/index.js`: struktur state baru `autoPingConfigs` (connections + schedules) diperluas dengan provider `antigravity`.
+- Suite test upstream (anchored schedule) berjalan berdampingan dengan test Antigravity custom.
+
+### 16. Eksposur noAuth providers di `/v1/models` (upstream v0.5.104)
+
+Upstream menambahkan blok yang otomatis memasukkan semua provider noAuth free ke `activeConnectionByProvider` **tanpa pengecekan disabled** (`a8f63f4d`). Ini akan membocorkan provider noAuth yang dinonaktifkan lewat fitur custom **Toggle Disable/Enable noAuth**.
+
+Rekonsiliasi: jalur utama (`dbAvailable`) tetap memakai cek `disabledNoAuthProviders` custom; blok upstream dipindah ke cabang `else` (fallback saat DB tidak tersedia).
+
+### 17. Interaksi lainnya (upstream v0.5.104)
+
+* **ModelSelectModal live-fetch** (upstream): koneksi di-fetch live saat modal dibuka (`fetchedConnections` → `effectiveConnections`); filter custom "SQLite `0` = inactive" diterapkan pada `effectiveConnections`.
+* **Hermes audio transcription / STT** (`d6431f8b`): fitur baru upstream (audioEnabled + sttModel); tombol Apply/Reset dibungkus guard custom `hermesStatus.installed` agar Manual Config tetap tersedia saat CLI tidak terinstall.
+* **Model picker regex/batch search** (`da1756a8`): fitur upstream murni, tidak bersinggungan dengan custom.
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._

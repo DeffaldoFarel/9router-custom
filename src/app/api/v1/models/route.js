@@ -381,7 +381,7 @@ export async function buildModelsList(kindFilter, options = {}) {
           .map(c => c.provider)
       );
     } catch(e) {}
-    
+
     Object.keys(FREE_PROVIDERS).forEach(providerId => {
       if (FREE_PROVIDERS[providerId].noAuth && !disabledNoAuthProviders.has(providerId) && !activeConnectionByProvider.has(providerId)) {
         activeConnectionByProvider.set(providerId, {
@@ -391,6 +391,18 @@ export async function buildModelsList(kindFilter, options = {}) {
         });
       }
     });
+  } else {
+    // Upstream fallback: include no-auth free providers (e.g. opencode) so their
+    // models are exposed in /v1/models even when the DB is unavailable.
+    for (const [id, provider] of Object.entries(FREE_PROVIDERS || {})) {
+      if (provider?.noAuth && !activeConnectionByProvider.has(id)) {
+        activeConnectionByProvider.set(id, {
+          id: "noauth",
+          provider: id,
+          isActive: true,
+        });
+      }
+    }
   }
 
   const models = [];
@@ -433,7 +445,7 @@ export async function buildModelsList(kindFilter, options = {}) {
       if (!providerMatchesKinds(providerId, kindFilter)) continue;
       for (const model of providerModels) {
         if (!kindFilter.includes(modelKind(model))) continue;
-        if (isDisabled(alias, model.id)) continue;
+        if (isDisabled(alias, model.id) || isDisabled(providerId, model.id)) continue;
         models.push({
           id: `${alias}/${model.id}`,
           object: "model",
