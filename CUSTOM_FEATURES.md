@@ -292,6 +292,14 @@ Rekonsiliasi: jalur utama (`dbAvailable`) tetap memakai cek `disabledNoAuthProvi
 
 ---
 
+### 18. Merge bersih (upstream v0.5.109)
+
+Merge v0.5.104 → v0.5.109 berjalan **tanpa konflik sama sekali**. Seluruh fitur custom (Test All, Auto-Ping Antigravity, noAuth toggle, Kiro fallback, dynamic fetch suppression, cURL section, guard `installed` pada ToolCards) tetap utuh — verifikasi 13/13 keep-checks lolos, 15 file JSX tervalidasi via esbuild.
+
+Fitur upstream baru yang tidak bersinggungan dengan custom: Smart Router (System One) dengan adaptive session stickiness, web-cookie providers (browser pool + login capture), SenseNova, Codex OAuth STT, RTK custom system prompt.
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
