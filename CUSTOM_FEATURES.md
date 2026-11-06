@@ -300,6 +300,14 @@ Fitur upstream baru yang tidak bersinggungan dengan custom: Smart Router (System
 
 ---
 
+### 19. Merge bersih (upstream v0.5.112)
+
+Merge v0.5.109 → v0.5.112 kembali berjalan **tanpa konflik**. Seluruh fitur custom tetap utuh — verifikasi 17/17 keep-checks lolos, 86 file JS tervalidasi esbuild (JSX-aware).
+
+Fitur upstream baru: MiniMax Code Desktop Lease (named-pipe broker), provider Nace Drex & Runcrate, Ollama Local TTS (Phonon) + embeddings adapter, GPT-6.1 Terra, Kimi K3.1 Pro.
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
