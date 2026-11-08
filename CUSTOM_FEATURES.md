@@ -308,6 +308,14 @@ Fitur upstream baru: MiniMax Code Desktop Lease (named-pipe broker), provider Na
 
 ---
 
+### 20. Merge bersih (upstream v0.5.116)
+
+Merge v0.5.112 → v0.5.116 berjalan **tanpa konflik**. Seluruh fitur custom tetap utuh — verifikasi 16/16 keep-checks lolos, 91 file JS tervalidasi (esbuild untuk JSX, `node --check` untuk sisanya).
+
+Fitur upstream baru: Gemini 4 Argon quota terpisah di dashboard, GPT Image 2.6, SenseNova 6.8-flash & glm-5.3, CommandCode CLI v1.88.5 auto-import, perbaikan keep-alive socket & DPI network transport.
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
