@@ -316,6 +316,16 @@ Fitur upstream baru: Gemini 4 Argon quota terpisah di dashboard, GPT Image 2.6, 
 
 ---
 
+### 21. Auto-Ping catching-up + Antigravity (upstream v0.5.119)
+
+Upstream menambahkan `catchingUpReset` di `quotaAutoPing.js` (`ce1e0c3c`): deadline yang terlewat antar-tick disimpan ulang ke `resetCache` agar cooldown kegagalan tidak membuang siklus ping.
+
+Konflik dengan handler **Antigravity custom** diselesaikan dengan menggabungkan keduanya: blok alternating model (`pingModels`) tetap dijalankan, `catchingUpReset` upstream diterapkan sebelum `sendPing`, dan `selectedPingModel` tetap diteruskan ke `sendAntigravityPing`.
+
+Catatan: rilis upstream diberi tag **v0.5.119**, tetapi `package.json` upstream masih `0.5.116` (upstream lupa bump). Versi custom mengikuti `package.json` upstream apa adanya.
+
+---
+
 ## Planned Features
 
 _Belum ada fitur lain yang direncanakan._
